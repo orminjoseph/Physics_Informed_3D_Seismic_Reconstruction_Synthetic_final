@@ -523,27 +523,126 @@ class Trainer:
                 inputs,
                 targets,
                 mask,
-                velocity_model
+                velocity_model,
+                mask_type,
+                geological_mode
             )
+
+        The first four elements are tensors used for training.
+        The final two elements are dataset metadata.
         """
 
         if not isinstance(
-            batch,
-            (tuple, list)
+                batch,
+                (tuple, list)
         ):
-
             raise TypeError(
                 "Dataset batch must be a tuple or list."
             )
 
-        if len(batch) != 4:
-
+        if len(batch) != 6:
             raise ValueError(
                 "Expected dataset batch to contain exactly "
-                "four tensors: "
-                "(inputs, targets, mask, velocity_model)."
+                "six elements: "
+                "(inputs, targets, mask, velocity_model, "
+                "mask_type, geological_mode)."
             )
 
+        (
+            inputs,
+            targets,
+            mask,
+            velocity_model,
+            mask_type,
+            geological_mode,
+        ) = batch
+
+        # =================================================
+        # VALIDATE TENSORS
+        # =================================================
+
+        tensors = (
+            inputs,
+            targets,
+            mask,
+            velocity_model,
+        )
+
+        tensor_names = (
+            "inputs",
+            "targets",
+            "mask",
+            "velocity_model",
+        )
+
+        for tensor, name in zip(
+                tensors,
+                tensor_names,
+        ):
+
+            if not isinstance(
+                    tensor,
+                    torch.Tensor
+            ):
+                raise TypeError(
+                    f"{name} must be a torch.Tensor, "
+                    f"but received "
+                    f"{type(tensor).__name__}."
+                )
+
+        # ---------------------------------------------------------
+        # Validate metadata after DataLoader collation
+        # ---------------------------------------------------------
+        #
+        # PyTorch's default DataLoader collation converts string
+        # metadata into a sequence of strings.
+        #
+        # Example for batch_size=1:
+        #
+        #     "missing_crosslines"
+        #
+        # becomes:
+        #
+        #     ["missing_crosslines"]
+        #
+        # Therefore, the Trainer should validate the metadata as
+        # a list/tuple of strings rather than requiring a single
+        # string.
+        # ---------------------------------------------------------
+
+        if not isinstance(
+                mask_type,
+                (list, tuple)
+        ):
+            raise TypeError(
+                "mask_type must be a list or tuple of strings "
+                "after DataLoader collation."
+            )
+
+        if not all(
+                isinstance(item, str)
+                for item in mask_type
+        ):
+            raise TypeError(
+                "Every mask_type metadata value must be a string."
+            )
+
+        if not isinstance(
+                geological_mode,
+                (list, tuple)
+        ):
+            raise TypeError(
+                "geological_mode must be a list or tuple of strings "
+                "after DataLoader collation."
+            )
+
+        if not all(
+                isinstance(item, str)
+                for item in geological_mode
+        ):
+            raise TypeError(
+                "Every geological_mode metadata value must be a string."
+            )
 
     # =====================================================
     # TENSOR VALIDATION
@@ -625,6 +724,8 @@ class Trainer:
                 targets,
                 mask,
                 velocity_model,
+                mask_type,
+                geological_mode,
             ) = batch
 
             # -------------------------------------------------
@@ -756,14 +857,14 @@ class Trainer:
             # =================================================
 
             losses = self.criterion(
-                reconstruction,
-                targets,
-                travel_time,
-                velocity_model,
-                log_variance,
+                prediction=reconstruction,
+                target=targets,
+                velocity=velocity_model,
+                travel_time=travel_time,
+                log_variance=log_variance,
             )
 
-            loss = losses["total"]
+            loss = losses["total_loss"]
 
             if not torch.isfinite(
                 loss
@@ -812,31 +913,31 @@ class Trainer:
             # =================================================
 
             running_total += (
-                losses["total"]
+                losses["total_loss"]
                 .detach()
                 .item()
             )
 
             running_mae += (
-                losses["mae"]
+                losses["mae_loss"]
                 .detach()
                 .item()
             )
 
             running_physics += (
-                losses["physics"]
+                losses["physics_loss"]
                 .detach()
                 .item()
             )
 
             running_uncertainty += (
-                losses["uncertainty"]
+                losses["uncertainty_loss"]
                 .detach()
                 .item()
             )
 
             running_ssim += (
-                losses["ssim"]
+                losses["ssim_loss"]
                 .detach()
                 .item()
             )
@@ -884,17 +985,42 @@ class Trainer:
     # =====================================================
 
     def validate_epoch(
-        self,
-        dataloader,
+            self,
+            dataloader,
     ):
         """
         Validate the model for one epoch.
 
         Validation is deterministic because the model is
         placed in evaluation mode and gradients are disabled.
+
+        Dataset batch format:
+
+            (
+                inputs,
+                targets,
+                mask,
+                velocity_model,
+                mask_type,
+                geological_mode
+            )
+
+        The first four elements are tensors used by the
+        validation pipeline.
+
+        The final two elements are metadata produced by the
+        synthetic dataset and collated by PyTorch's DataLoader.
         """
 
+        # =========================================================
+        # EVALUATION MODE
+        # =========================================================
+
         self.model.eval()
+
+        # ---------------------------------------------------------
+        # Running composite-loss components
+        # ---------------------------------------------------------
 
         running_total = 0.0
         running_mae = 0.0
@@ -902,27 +1028,42 @@ class Trainer:
         running_uncertainty = 0.0
         running_ssim = 0.0
 
+        # ---------------------------------------------------------
+        # Running reconstruction metrics
+        # ---------------------------------------------------------
+
         running_metric_mae = 0.0
         running_metric_rmse = 0.0
         running_metric_psnr = 0.0
         running_metric_snr = 0.0
         running_metric_ssim = 0.0
 
+        # =========================================================
+        # VALIDATION DATALOADER CHECK
+        # =========================================================
+
         num_batches = len(
             dataloader
         )
 
         if num_batches == 0:
-
             raise RuntimeError(
                 "Validation DataLoader contains no batches."
             )
 
+        # =========================================================
+        # VALIDATION LOOP
+        # =========================================================
+
         with torch.no_grad():
 
             for batch_index, batch in enumerate(
-                dataloader
+                    dataloader
             ):
+
+                # -------------------------------------------------
+                # Validate complete six-element dataset batch
+                # -------------------------------------------------
 
                 self._validate_batch(
                     batch
@@ -933,7 +1074,13 @@ class Trainer:
                     targets,
                     mask,
                     velocity_model,
+                    mask_type,
+                    geological_mode,
                 ) = batch
+
+                # -------------------------------------------------
+                # Move tensor data to the selected device
+                # -------------------------------------------------
 
                 inputs = inputs.to(
                     self.device,
@@ -955,6 +1102,10 @@ class Trainer:
                     non_blocking=True
                 )
 
+                # =================================================
+                # MODEL FORWARD PASS
+                # =================================================
+
                 (
                     reconstruction,
                     travel_time,
@@ -963,26 +1114,23 @@ class Trainer:
                     inputs
                 )
 
-                # -------------------------------------------------
-                # Shape validation
-                # -------------------------------------------------
+                # =================================================
+                # SHAPE VALIDATION
+                # =================================================
 
                 if reconstruction.shape != targets.shape:
-
                     raise RuntimeError(
                         "Validation reconstruction and target "
                         "shapes do not match."
                     )
 
                 if travel_time.shape != velocity_model.shape:
-
                     raise RuntimeError(
                         "Validation travel-time and velocity "
                         "shapes do not match."
                     )
 
                 if log_variance.shape != reconstruction.shape:
-
                     raise RuntimeError(
                         "Validation log-variance and "
                         "reconstruction shapes do not match."
@@ -991,13 +1139,28 @@ class Trainer:
                 # =================================================
                 # COMPOSITE VALIDATION LOSS
                 # =================================================
+                #
+                # Use explicit keyword arguments because the
+                # TotalLoss interface is:
+                #
+                # prediction
+                # target
+                # velocity
+                # source_indices
+                # travel_time
+                # travel_time_target
+                # log_variance
+                #
+                # Source and travel-time target are not being
+                # supplied in the current synthetic configuration.
+                # =================================================
 
                 losses = self.criterion(
-                    reconstruction,
-                    targets,
-                    travel_time,
-                    velocity_model,
-                    log_variance,
+                    prediction=reconstruction,
+                    target=targets,
+                    velocity=velocity_model,
+                    travel_time=travel_time,
+                    log_variance=log_variance,
                 )
 
                 # =================================================
@@ -1034,8 +1197,9 @@ class Trainer:
                 # =================================================
 
                 values_to_check = {
+
                     "validation_total":
-                        losses["total"],
+                        losses["total_loss"],
 
                     "validation_mae":
                         metric_mae,
@@ -1056,65 +1220,78 @@ class Trainer:
                 for name, value in values_to_check.items():
 
                     if not torch.isfinite(
-                        torch.as_tensor(value)
+                            torch.as_tensor(value)
                     ).all():
-
                         raise RuntimeError(
                             f"Non-finite {name} detected."
                         )
 
                 # =================================================
-                # ACCUMULATE
+                # ACCUMULATE COMPOSITE LOSS COMPONENTS
                 # =================================================
 
                 running_total += (
-                    losses["total"]
+                    losses["total_loss"]
                     .detach()
                     .item()
                 )
 
                 running_mae += (
-                    losses["mae"]
+                    losses["mae_loss"]
                     .detach()
                     .item()
                 )
 
                 running_physics += (
-                    losses["physics"]
+                    losses["physics_loss"]
                     .detach()
                     .item()
                 )
 
                 running_uncertainty += (
-                    losses["uncertainty"]
+                    losses["uncertainty_loss"]
                     .detach()
                     .item()
                 )
 
                 running_ssim += (
-                    losses["ssim"]
+                    losses["ssim_loss"]
                     .detach()
                     .item()
                 )
 
+                # =================================================
+                # ACCUMULATE RECONSTRUCTION METRICS
+                # =================================================
+
                 running_metric_mae += (
-                    metric_mae.detach().item()
+                    metric_mae
+                    .detach()
+                    .item()
                 )
 
                 running_metric_rmse += (
-                    metric_rmse.detach().item()
+                    metric_rmse
+                    .detach()
+                    .item()
                 )
 
                 running_metric_psnr += (
-                    metric_psnr.detach().item()
+                    metric_psnr
+                    .detach()
+                    .item()
                 )
 
                 running_metric_snr += (
-                    metric_snr.detach().item()
+                    metric_snr
+                    .detach()
+                    .item()
                 )
 
                 running_metric_ssim += (
-                    metric_ssim.detach().item()
+                    metric_ssim
+                    .detach()
+                    .item()
                 )
 
                 # =================================================
@@ -1122,7 +1299,6 @@ class Trainer:
                 # =================================================
 
                 if batch_index == 0:
-
                     uncertainty = torch.exp(
                         0.5 * log_variance
                     )
@@ -1136,19 +1312,19 @@ class Trainer:
                         self.current_epoch,
                     )
 
-                # -------------------------------------------------
-                # Optional debug information
-                # -------------------------------------------------
+                # =================================================
+                # OPTIONAL DEBUG INFORMATION
+                # =================================================
 
                 if (
-                    DEBUG_VALIDATION
-                    and batch_index == 0
+                        DEBUG_VALIDATION
+                        and batch_index == 0
                 ):
-
                     print()
                     print(
                         "Validation Batch Statistics"
                     )
+
                     print(
                         "-" * 40
                     )
@@ -1193,9 +1369,9 @@ class Trainer:
                         f"{log_variance.max().item():.6f}"
                     )
 
-        # =====================================================
+        # =========================================================
         # RETURN VALIDATION RESULTS
-        # =====================================================
+        # =========================================================
 
         return {
 
@@ -1229,7 +1405,6 @@ class Trainer:
             "metric_ssim":
                 running_metric_ssim / num_batches,
         }
-
 
     # =====================================================
     # VALIDATION VISUALIZATION

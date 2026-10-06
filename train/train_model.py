@@ -225,7 +225,7 @@ def train_final_model():
     # 2. Establish reproducibility.
     # ------------------------------------------------------------------
 
-    set_global_seed(config.RANDOM_SEED)
+    set_global_seed(config.SEED)
 
     # ------------------------------------------------------------------
     # 3. Resolve computational device.
@@ -285,10 +285,9 @@ def train_final_model():
     print("-" * 78)
 
     train_dataset, validation_dataset = split_dataset(
-        dataset,
-        validation_split=config.VALIDATION_SPLIT,
-        seed=config.RANDOM_SEED,
+        dataset
     )
+
 
     if len(train_dataset) == 0:
         raise RuntimeError(
@@ -435,10 +434,7 @@ def train_final_model():
     print("INITIALIZING EXPERIMENT MANAGER")
     print("-" * 78)
 
-    experiment_manager = ExperimentManager(
-        root=config.OUTPUT_ROOT,
-        experiment_name=config.EXPERIMENT_NAME,
-    )
+    experiment_manager = ExperimentManager()
 
     # ------------------------------------------------------------------
     # 11. Verify the experiment checkpoint directory.
@@ -505,12 +501,11 @@ def train_final_model():
     print("=" * 78)
 
     trainer.fit(
-        train_loader=train_loader,
-        validation_loader=validation_loader,
+        train_dataloader=train_loader,
+        validation_dataloader=validation_loader,
         epochs=config.NUM_EPOCHS,
         resume=True,
     )
-
     # ------------------------------------------------------------------
     # 14. Verify that the expected best checkpoint exists.
     # ------------------------------------------------------------------

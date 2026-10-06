@@ -430,7 +430,7 @@ GALLERY_NUMBER_OF_SAMPLES = 5
 # TRAINING CONTROL
 # ---------------------------------------------------------
 
-RUN_TRAINING = False
+RUN_TRAINING = True
 
 
 # ---------------------------------------------------------

@@ -16,18 +16,21 @@ pipeline.
 
 The master pipeline coordinates:
 
-    1. Training / checkpoint verification
-    2. Model evaluation
-    3. Reconstruction gallery generation
-    4. Uncertainty analysis
-    5. Uncertainty evaluation
-    6. Uncertainty statistics
-    7. Common seven-method reconstruction comparison
-    8. Controlled classical-baseline experiments
-    9. Controlled proposed-model experiment
-   10. Ablation study
-   11. Statistical significance analysis
-   12. Thesis tables and final report
+    1. Configuration validation
+    2. Final model training / checkpoint resume
+    3. Best-model checkpoint verification
+    4. Complete model evaluation
+    5. Reconstruction gallery generation
+    6. Uncertainty analysis
+    7. Uncertainty evaluation
+    8. Uncertainty statistics
+    9. Common seven-method reconstruction comparison
+   10. Controlled classical-baseline experiments
+   11. Controlled proposed-model experiment
+   12. Ablation study
+   13. Statistical significance analysis
+   14. Thesis tables
+   15. Final report
 
 IMPORTANT
 ---------
@@ -35,7 +38,7 @@ This file is an ORCHESTRATOR.
 
 Detailed scientific computation belongs to the appropriate module.
 
-This file should NOT duplicate:
+This file must NOT duplicate:
 
     - model architecture
     - loss calculations
@@ -47,48 +50,90 @@ This file should NOT duplicate:
     - statistical tests
     - thesis-table calculations
 
-The master pipeline only determines:
+The master pipeline determines only:
 
     what should run,
     in what order,
     and whether required outputs exist.
 
-Training and evaluation are intentionally separated.
+TRAINING
+--------
+Only ONE final proposed model is trained.
 
-Training:
-    dataset
-        |
-        v
-    final model training
-        |
-        v
+The training module is responsible for:
+
+    - dataset creation
+    - dataset splitting
+    - model construction
+    - loss construction
+    - optimizer
+    - checkpoint saving
+    - checkpoint resume
+    - final best-model selection
+
+The master pipeline does not duplicate any of these operations.
+
+EVALUATION
+----------
+Evaluation begins only after a valid:
+
     best_model.pth
 
-Evaluation:
-    best_model.pth
-        |
-        v
-    controlled evaluation matrix
-        |
-        v
-    case-level results
-        |
-        v
-    statistical analysis
-        |
-        v
-    final report
+has been verified.
 
-The controlled evaluation matrix is NOT used to train 750 models.
+The controlled evaluation matrix is NOT used to train
+750 different models.
 
 Only ONE final model is trained.
 
-The complete controlled matrix is defined by the evaluation
-modules. This master script does not hard-code the matrix size.
+The complete controlled matrix is defined by the
+evaluation modules.
+
+Current project structure:
+
+    Training
+        |
+        v
+    train_final_model()
+        |
+        v
+    best_model.pth
+        |
+        v
+    Complete evaluation
+        |
+        v
+    Case-level results
+        |
+        v
+    Statistical analysis
+        |
+        v
+    Thesis tables
+        |
+        v
+    Final report
+
+DATASET MODE
+------------
+All output locations are derived from:
+
+    config.DATASET_MODE
+    config.EXPERIMENT_NAME
+    config.CHECKPOINT_DIR
+    config.FIGURE_DIR
+    config.REPORT_DIR
+
+Therefore this master pipeline does not hard-code:
+
+    outputs/synthetic_training/
+
+or any other experiment-specific path.
 
 Author: Ormin Joseph
 ======================================================================
 """
+
 
 # ======================================================================
 # STANDARD LIBRARY
@@ -110,11 +155,23 @@ from utils import config
 # PROJECT ROOT
 # ======================================================================
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = (
+    Path(__file__).resolve().parent
+)
 
 
 # ======================================================================
-# CHECKPOINT PATH
+# BEST CHECKPOINT
+# ======================================================================
+#
+# The checkpoint location is derived entirely from the centralized
+# configuration.
+#
+# For the current synthetic experiment this resolves to:
+#
+#     outputs/synthetic_training/checkpoints/best_model.pth
+#
+# but the master pipeline does not hard-code that path.
 # ======================================================================
 
 BEST_CHECKPOINT = (
@@ -140,7 +197,9 @@ PIPELINE_RESULTS = {
 # DISPLAY HELPERS
 # ======================================================================
 
-def print_header(title: str) -> None:
+def print_header(
+    title: str,
+) -> None:
     """
     Print a clearly separated pipeline section header.
     """
@@ -152,28 +211,40 @@ def print_header(title: str) -> None:
     print()
 
 
-def print_success(message: str) -> None:
+def print_success(
+    message: str,
+) -> None:
     """
     Print a successful pipeline message.
     """
 
-    print(f"[PASS] {message}")
+    print(
+        f"[PASS] {message}"
+    )
 
 
-def print_warning(message: str) -> None:
+def print_warning(
+    message: str,
+) -> None:
     """
     Print a warning without terminating the pipeline.
     """
 
-    print(f"[WARNING] {message}")
+    print(
+        f"[WARNING] {message}"
+    )
 
 
-def print_failure(message: str) -> None:
+def print_failure(
+    message: str,
+) -> None:
     """
     Print a pipeline failure message.
     """
 
-    print(f"[FAIL] {message}")
+    print(
+        f"[FAIL] {message}"
+    )
 
 
 # ======================================================================
@@ -182,10 +253,11 @@ def print_failure(message: str) -> None:
 
 def validate_configuration() -> bool:
     """
-    Validate the minimum configuration required by the master pipeline.
+    Validate the minimum configuration required by the
+    master pipeline.
 
-    The detailed configuration validation remains the responsibility
-    of utils.config.
+    Detailed scientific/configuration validation remains
+    the responsibility of utils.config.
     """
 
     print_header(
@@ -199,10 +271,16 @@ def validate_configuration() -> bool:
     if not isinstance(
         config.EXPERIMENT_NAME,
         str,
-    ) or not config.EXPERIMENT_NAME.strip():
+    ):
 
         raise RuntimeError(
-            "EXPERIMENT_NAME must be a non-empty string."
+            "EXPERIMENT_NAME must be a string."
+        )
+
+    if not config.EXPERIMENT_NAME.strip():
+
+        raise RuntimeError(
+            "EXPERIMENT_NAME must not be empty."
         )
 
     # ------------------------------------------------------------------
@@ -212,10 +290,16 @@ def validate_configuration() -> bool:
     if not isinstance(
         config.DATASET_MODE,
         str,
-    ) or not config.DATASET_MODE.strip():
+    ):
 
         raise RuntimeError(
-            "DATASET_MODE must be a non-empty string."
+            "DATASET_MODE must be a string."
+        )
+
+    if not config.DATASET_MODE.strip():
+
+        raise RuntimeError(
+            "DATASET_MODE must not be empty."
         )
 
     # ------------------------------------------------------------------
@@ -228,11 +312,14 @@ def validate_configuration() -> bool:
     ):
 
         raise RuntimeError(
-            "DEVICE must be a string such as "
-            "'cpu', 'cuda', or 'auto'."
+            "DEVICE must be a string."
         )
 
-    device_policy = config.DEVICE.lower().strip()
+    device_policy = (
+        config.DEVICE
+        .lower()
+        .strip()
+    )
 
     if device_policy not in {
         "auto",
@@ -246,17 +333,17 @@ def validate_configuration() -> bool:
         )
 
     # ------------------------------------------------------------------
-    # Controlled-matrix case limit
+    # Controlled evaluation case limit
     # ------------------------------------------------------------------
     #
     # None:
-    #     run the complete controlled evaluation matrix.
+    #     complete controlled matrix.
     #
     # Integer:
-    #     run only that number of cases for smoke testing.
+    #     limited smoke-test run.
     #
-    # The actual number of factors/cases belongs to the evaluation
-    # modules and is deliberately not hard-coded here.
+    # The master pipeline does not define the experimental factors.
+    # Those belong to the evaluation modules.
     # ------------------------------------------------------------------
 
     case_limit = (
@@ -271,19 +358,19 @@ def validate_configuration() -> bool:
         ):
 
             raise RuntimeError(
-                "CONTROLLED_MATRIX_CASE_LIMIT must be "
-                "an integer or None."
+                "CONTROLLED_MATRIX_CASE_LIMIT must "
+                "be an integer or None."
             )
 
         if case_limit <= 0:
 
             raise RuntimeError(
-                "CONTROLLED_MATRIX_CASE_LIMIT must be "
-                "greater than zero or None."
+                "CONTROLLED_MATRIX_CASE_LIMIT must "
+                "be greater than zero or None."
             )
 
     # ------------------------------------------------------------------
-    # Create required top-level directories.
+    # Create the required project directories.
     # ------------------------------------------------------------------
 
     checkpoint_directory = Path(
@@ -291,6 +378,15 @@ def validate_configuration() -> bool:
     )
 
     checkpoint_directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    figure_directory = Path(
+        config.FIGURE_DIR
+    )
+
+    figure_directory.mkdir(
         parents=True,
         exist_ok=True,
     )
@@ -371,7 +467,7 @@ def verify_checkpoint() -> bool:
 
         best_model.pth
 
-    rather than the latest intermediate checkpoint.
+    rather than an arbitrary latest checkpoint.
     """
 
     print_header(
@@ -389,7 +485,7 @@ def verify_checkpoint() -> bool:
     if not checkpoint.exists():
 
         raise FileNotFoundError(
-            "Required best model checkpoint was not found:\n"
+            "Required best-model checkpoint was not found:\n"
             f"{checkpoint}\n\n"
             "Train the final model first by setting "
             "RUN_TRAINING=True."
@@ -399,15 +495,19 @@ def verify_checkpoint() -> bool:
     # File-size check
     # ------------------------------------------------------------------
 
-    if checkpoint.stat().st_size <= 0:
+    checkpoint_size = (
+        checkpoint.stat().st_size
+    )
+
+    if checkpoint_size <= 0:
 
         raise RuntimeError(
-            "The best model checkpoint exists but is empty:\n"
+            "The best-model checkpoint exists but is empty:\n"
             f"{checkpoint}"
         )
 
     # ------------------------------------------------------------------
-    # Display checkpoint information
+    # Display checkpoint information.
     # ------------------------------------------------------------------
 
     print(
@@ -423,11 +523,11 @@ def verify_checkpoint() -> bool:
     )
 
     print(
-        f"    {checkpoint.stat().st_size:,} bytes"
+        f"    {checkpoint_size:,} bytes"
     )
 
     print_success(
-        "Best model checkpoint verified."
+        "Best-model checkpoint verified."
     )
 
     PIPELINE_RESULTS[
@@ -443,25 +543,28 @@ def verify_checkpoint() -> bool:
 
 def run_training_stage() -> bool:
     """
-    Execute the final model training stage.
+    Execute the final proposed-model training stage.
 
-    The training module is imported lazily.
+    The actual training implementation remains entirely inside:
 
-    This is intentional because when:
+        train.train_model.train_final_model()
 
-        RUN_TRAINING=False
+    This function does NOT duplicate:
 
-    the master pipeline must be able to evaluate an already-trained
-    model without requiring the training entry point to be imported
-    during startup.
+        - dataset construction
+        - model construction
+        - loss construction
+        - optimizer construction
+        - checkpoint loading
+        - checkpoint saving
+        - resume logic
+        - epoch handling
 
-    The actual training entry point is:
+    The current Trainer already handles checkpoint resume correctly.
 
-        train_final_model()
-
-    not:
-
-        main()
+    Therefore, if training is interrupted after a valid checkpoint
+    has been created, calling train_final_model() again allows the
+    existing training/checkpoint mechanism to resume from that state.
     """
 
     print_header(
@@ -469,7 +572,7 @@ def run_training_stage() -> bool:
     )
 
     # ------------------------------------------------------------------
-    # Training disabled
+    # Training disabled.
     # ------------------------------------------------------------------
 
     if not config.RUN_TRAINING:
@@ -493,13 +596,10 @@ def run_training_stage() -> bool:
         return True
 
     # ------------------------------------------------------------------
-    # Lazy import of the actual training entry point.
+    # Lazy import.
     #
-    # The user's actual train/train_model.py defines:
-    #
-    #     train_final_model()
-    #
-    # It does not define main().
+    # This prevents unnecessary training-module initialization when
+    # the master pipeline is being used only for evaluation.
     # ------------------------------------------------------------------
 
     from train.train_model import (
@@ -507,13 +607,20 @@ def run_training_stage() -> bool:
     )
 
     # ------------------------------------------------------------------
-    # Execute final-model training.
+    # Execute final model training.
+    #
+    # IMPORTANT:
+    #
+    # train_final_model() owns the resume mechanism.
+    #
+    # The master pipeline does not pass an epoch number or manually
+    # manipulate checkpoint state.
     # ------------------------------------------------------------------
 
     train_final_model()
 
     print_success(
-        "Final model training completed."
+        "Final model training stage completed."
     )
 
     PIPELINE_RESULTS[
@@ -531,12 +638,12 @@ def run_evaluation_stage() -> bool:
     """
     Execute the complete downstream evaluation pipeline.
 
-    Detailed scientific evaluation remains inside:
+    The detailed scientific sequence remains inside:
 
         evaluation.run_full_evaluation
 
-    The master pipeline deliberately does not duplicate the individual
-    evaluation stages.
+    The master pipeline deliberately does not duplicate individual
+    evaluation modules.
     """
 
     print_header(
@@ -544,13 +651,13 @@ def run_evaluation_stage() -> bool:
     )
 
     # ------------------------------------------------------------------
-    # The evaluation stage requires a valid trained checkpoint.
+    # Evaluation cannot begin without a valid best checkpoint.
     # ------------------------------------------------------------------
 
     verify_checkpoint()
 
     # ------------------------------------------------------------------
-    # Import the evaluation controller only when evaluation begins.
+    # Lazy import of the evaluation controller.
     # ------------------------------------------------------------------
 
     from evaluation.run_full_evaluation import (
@@ -559,6 +666,13 @@ def run_evaluation_stage() -> bool:
 
     # ------------------------------------------------------------------
     # Execute the complete evaluation sequence.
+    #
+    # We deliberately do not pass RESUME_EVALUATION or
+    # FORCE_RERUN_EVALUATION as arguments here because the exact
+    # interface of run_full_evaluation() belongs to that module.
+    #
+    # Those configuration values should only be wired into this
+    # function after its actual interface has been verified.
     # ------------------------------------------------------------------
 
     run_full_evaluation()
@@ -582,19 +696,19 @@ def verify_final_outputs() -> bool:
     """
     Perform final master-level output verification.
 
-    Individual scientific evaluation modules are responsible for
-    validating their own detailed output files.
+    Individual scientific evaluation modules remain responsible
+    for validating their detailed result files.
 
-    Therefore this function verifies only the critical project-level
+    The master pipeline verifies only critical project-level
     artifacts:
 
         1. best_model.pth exists and is non-empty.
         2. evaluation completed successfully.
-        3. report directory exists.
+        3. figure directory exists.
+        4. report directory exists.
 
-    This function deliberately does NOT require a specific filename
-    such as final_report.txt because the detailed evaluation controller
-    owns the report-generation implementation.
+    The master pipeline deliberately does not assume a particular
+    final-report filename.
     """
 
     print_header(
@@ -602,7 +716,7 @@ def verify_final_outputs() -> bool:
     )
 
     # ------------------------------------------------------------------
-    # Verify best checkpoint.
+    # Verify checkpoint.
     # ------------------------------------------------------------------
 
     checkpoint = Path(
@@ -624,7 +738,7 @@ def verify_final_outputs() -> bool:
         )
 
     # ------------------------------------------------------------------
-    # Verify evaluation stage.
+    # Verify evaluation.
     # ------------------------------------------------------------------
 
     if not PIPELINE_RESULTS[
@@ -633,6 +747,21 @@ def verify_final_outputs() -> bool:
 
         raise RuntimeError(
             "Evaluation stage did not complete successfully."
+        )
+
+    # ------------------------------------------------------------------
+    # Verify figure directory.
+    # ------------------------------------------------------------------
+
+    figure_directory = Path(
+        config.FIGURE_DIR
+    )
+
+    if not figure_directory.exists():
+
+        raise RuntimeError(
+            "Figure directory does not exist:\n"
+            f"{figure_directory}"
         )
 
     # ------------------------------------------------------------------
@@ -655,11 +784,19 @@ def verify_final_outputs() -> bool:
     # ------------------------------------------------------------------
 
     print(
-        "Best checkpoint verified."
+        "Best-model checkpoint verified."
     )
 
     print(
         "Evaluation stage verified."
+    )
+
+    print(
+        "Figure directory verified:"
+    )
+
+    print(
+        f"    {figure_directory}"
     )
 
     print(
@@ -695,11 +832,20 @@ def print_pipeline_summary() -> None:
     )
 
     status_names = {
-        "configuration": "Configuration",
-        "training": "Training",
-        "checkpoint": "Checkpoint",
-        "evaluation": "Evaluation",
-        "final_outputs": "Final outputs",
+        "configuration":
+            "Configuration",
+
+        "training":
+            "Training",
+
+        "checkpoint":
+            "Checkpoint",
+
+        "evaluation":
+            "Evaluation",
+
+        "final_outputs":
+            "Final outputs",
     }
 
     for key, label in status_names.items():
@@ -777,7 +923,8 @@ def run_project() -> bool:
     print()
 
     print(
-        f"Project root : {PROJECT_ROOT}"
+        f"Project root : "
+        f"{PROJECT_ROOT}"
     )
 
     print(
@@ -803,21 +950,21 @@ def run_project() -> bool:
 
         # ==============================================================
         # STAGE 2
-        # TRAINING
+        # FINAL MODEL TRAINING
         # ==============================================================
 
         run_training_stage()
 
         # ==============================================================
         # STAGE 3
-        # CHECKPOINT
+        # BEST CHECKPOINT VERIFICATION
         # ==============================================================
 
         verify_checkpoint()
 
         # ==============================================================
         # STAGE 4
-        # COMPLETE EVALUATION
+        # COMPLETE SCIENTIFIC EVALUATION
         # ==============================================================
 
         run_evaluation_stage()
