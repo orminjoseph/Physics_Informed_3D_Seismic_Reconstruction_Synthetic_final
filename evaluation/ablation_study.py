@@ -59,10 +59,12 @@ Therefore:
 The uncertainty-loss correction is:
 
     use_uncertainty=True
-        uncertainty loss included
+        uncertainty loss included when log_variance is supplied
+        by the model.
 
     use_uncertainty=False
-        uncertainty loss excluded
+        model does not provide log_variance and therefore the
+        uncertainty loss contribution is zero.
 
 Therefore:
 
@@ -233,11 +235,13 @@ Protocol 2.0 defines the corrected uncertainty-loss behaviour.
 
 For uncertainty-enabled models:
 
-    uncertainty loss is active.
+    uncertainty loss is active when the model supplies
+    log_variance.
 
 For uncertainty-disabled models:
 
-    uncertainty loss is exactly zero.
+    uncertainty loss is exactly zero because no log_variance
+    output is supplied.
 """
 
 ABLATION_PROTOCOL_VERSION = "2.0"
@@ -446,6 +450,15 @@ def extract_reconstruction(
 ):
     """
     Extract the reconstruction tensor from Predictor output.
+
+    The current model interface is expected to return:
+
+        reconstruction,
+        log_variance,
+        auxiliary_output
+
+    or an equivalent tuple in which the reconstruction is the
+    first element.
     """
 
     if not isinstance(prediction, tuple):
@@ -806,15 +819,19 @@ def train_ablation_model(
     )
 
     # -------------------------------------------------------------
-    # Correct ablation-specific loss
+    # Current composite loss interface
+    #
+    # TotalLoss obtains the centralized loss configuration from
+    # utils.config.py.
+    #
+    # DX, DY and DZ are handled internally by PhysicsLoss.
+    #
+    # use_uncertainty is controlled by the model architecture.
+    # When uncertainty is disabled, the model does not provide
+    # log_variance and the uncertainty loss contribution is zero.
     # -------------------------------------------------------------
 
-    criterion = TotalLoss(
-        dx=DX,
-        dy=DY,
-        dz=DZ,
-        use_uncertainty=settings["use_uncertainty"],
-    )
+    criterion = TotalLoss()
 
     # -------------------------------------------------------------
     # Optimizer
@@ -851,8 +868,8 @@ def train_ablation_model(
     # -------------------------------------------------------------
 
     trainer.fit(
-        train_loader,
-        val_loader,
+        train_dataloader=train_loader,
+        validation_dataloader=val_loader,
         epochs=NUM_EPOCHS,
         resume=False,
     )
