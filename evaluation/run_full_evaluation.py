@@ -18,13 +18,21 @@ The runner supports:
     4. Uncertainty analysis
     5. Uncertainty evaluation
     6. Uncertainty statistics
-    7. Common seven-method representative comparison
-    8. Controlled six-classical-baseline experiments
-    9. Controlled proposed-model experiment
-   10. Ablation study
-   11. Statistical significance
-   12. Thesis tables
-   13. Final report
+    7. Controlled six-classical-baseline experiments
+    8. Controlled proposed-model experiment
+    9. Ablation study
+   10. Statistical significance
+   11. Thesis tables
+   12. Final report
+
+IMPORTANT
+---------
+The common seven-method representative comparison is NOT executed
+by this master controller.
+
+It is a separate evaluation and must be run independently through:
+
+    evaluation.baselines.compare_with_baselines
 
 Controlled experimental design
 ------------------------------
@@ -46,9 +54,6 @@ For development/smoke testing:
 For the final PhD experiment:
 
     CONTROLLED_MATRIX_CASE_LIMIT = None
-
-The same configured experimental matrix is therefore used for both
-smoke testing and the final 750-case evaluation.
 
 Resume behaviour
 ----------------
@@ -160,23 +165,6 @@ EXPECTED_CONTROLLED_CASES = (
 
 # ====================================================================
 # CONTROLLED CLASSICAL BASELINE DEFINITIONS
-# ====================================================================
-#
-# IMPORTANT:
-#
-# These module names match the actual files in:
-#
-#     evaluation/baselines/
-#
-# --------------------------------------------------------------------
-#
-# 1. baseline_nearest_neighbor_controlled_matrix.py
-# 2. baseline_linear_interpolation_controlled_matrix.py
-# 3. fx_controlled_matrix.py
-# 4. compressive_sensing_controlled_matrix.py
-# 5. curvelet_pocs_controlled_matrix.py
-# 6. dictionary_learning_controlled_matrix.py
-#
 # ====================================================================
 
 CONTROLLED_CLASSICAL_BASELINES = [
@@ -300,22 +288,12 @@ CONTROLLED_CLASSICAL_BASELINES = [
 # ====================================================================
 # PROPOSED MODEL CONTROLLED EXPERIMENT
 # ====================================================================
-#
-# Actual module:
-#
-#     evaluation/baselines/
-#         proposed_model_controlled_matrix.py
-#
-# ====================================================================
 
 PROPOSED_CONTROLLED_MODULE = (
     "evaluation.baselines."
     "proposed_model_controlled_matrix"
 )
 
-
-# The raw output filenames below correspond to the controlled
-# proposed-model result convention used by the evaluation pipeline.
 
 PROPOSED_CONTROLLED_CSV = (
     REPORT_PATH
@@ -335,9 +313,6 @@ PROPOSED_CONTROLLED_SUMMARY = (
 def print_header(
     title: str,
 ) -> None:
-    """
-    Print a consistent major section header.
-    """
 
     print()
     print("=" * 78)
@@ -349,9 +324,6 @@ def print_stage(
     stage_number: int,
     title: str,
 ) -> None:
-    """
-    Print the current evaluation stage.
-    """
 
     print()
     print("-" * 78)
@@ -367,13 +339,6 @@ def run_module(
     module_name: str,
     description: str,
 ) -> None:
-    """
-    Execute a Python module using the current project interpreter.
-
-    sys.executable guarantees that the same Python interpreter used
-    to launch this controller is also used by the individual
-    evaluation module.
-    """
 
     print()
     print(
@@ -408,9 +373,6 @@ def file_is_valid(
     path: Path,
     minimum_size: int = 1,
 ) -> bool:
-    """
-    Check whether a file exists and is non-empty.
-    """
 
     return (
         path.exists()
@@ -423,9 +385,6 @@ def csv_has_required_columns(
     path: Path,
     required_columns: list[str],
 ) -> bool:
-    """
-    Validate that a CSV exists and contains all required columns.
-    """
 
     if not file_is_valid(path):
 
@@ -464,13 +423,6 @@ def csv_has_expected_rows(
     path: Path,
     expected_rows: int,
 ) -> bool:
-    """
-    Validate that a controlled-matrix CSV contains the expected
-    number of experimental cases.
-
-    This prevents a 10-case smoke-test result from being mistaken
-    for a completed 750-case experiment.
-    """
 
     if not file_is_valid(path):
 
@@ -508,9 +460,6 @@ def csv_has_expected_rows(
 def json_is_valid(
     path: Path,
 ) -> bool:
-    """
-    Validate a JSON metadata file.
-    """
 
     if not file_is_valid(path):
 
@@ -535,9 +484,6 @@ def json_is_valid(
 def figure_is_valid(
     path: Path,
 ) -> bool:
-    """
-    Validate a generated figure.
-    """
 
     return file_is_valid(
         path,
@@ -550,9 +496,6 @@ def figure_is_valid(
 # ====================================================================
 
 def model_evaluation_complete() -> bool:
-    """
-    Check whether the main model evaluation is complete.
-    """
 
     path = (
         REPORT_PATH
@@ -575,10 +518,6 @@ def model_evaluation_complete() -> bool:
 # ====================================================================
 
 def reconstruction_gallery_complete() -> bool:
-    """
-    Check whether the reconstruction gallery contains the configured
-    number of sample figures.
-    """
 
     gallery_dir = (
         REPORT_PATH
@@ -616,9 +555,6 @@ def reconstruction_gallery_complete() -> bool:
 # ====================================================================
 
 def uncertainty_analysis_complete() -> bool:
-    """
-    Check whether uncertainty analysis has completed.
-    """
 
     path = (
         REPORT_PATH
@@ -634,9 +570,6 @@ def uncertainty_analysis_complete() -> bool:
 # ====================================================================
 
 def uncertainty_evaluation_complete() -> bool:
-    """
-    Check whether uncertainty evaluation has completed.
-    """
 
     evaluation_csv = (
         REPORT_PATH
@@ -687,9 +620,6 @@ def uncertainty_evaluation_complete() -> bool:
 # ====================================================================
 
 def uncertainty_statistics_complete() -> bool:
-    """
-    Check whether uncertainty statistics have been generated.
-    """
 
     path = (
         REPORT_PATH
@@ -722,46 +652,6 @@ def uncertainty_statistics_complete() -> bool:
 
 # ====================================================================
 # STAGE 6 VALIDATION
-# ====================================================================
-
-def baseline_comparison_complete() -> bool:
-    """
-    Check whether the common seven-method comparison has completed.
-
-    This is intentionally separate from the controlled factorial
-    experiments.
-    """
-
-    path = (
-        REPORT_PATH
-        / "baseline_comparison.csv"
-    )
-
-    summary_path = (
-        REPORT_PATH
-        / "baseline_comparison_summary.csv"
-    )
-
-    return (
-        csv_has_required_columns(
-            path,
-            [
-                "Method",
-                "MAE",
-                "RMSE",
-                "PSNR",
-                "SNR",
-                "SSIM",
-            ],
-        )
-        and file_is_valid(
-            summary_path
-        )
-    )
-
-
-# ====================================================================
-# STAGE 7 VALIDATION
 # ====================================================================
 
 def controlled_classical_baselines_complete() -> bool:
@@ -814,14 +704,10 @@ def controlled_classical_baselines_complete() -> bool:
 
 
 # ====================================================================
-# STAGE 8 VALIDATION
+# STAGE 7 VALIDATION
 # ====================================================================
 
 def controlled_proposed_model_complete() -> bool:
-    """
-    Check whether the proposed model controlled experiment has
-    completed with the expected number of cases.
-    """
 
     required_columns = [
         "Case_ID",
@@ -855,13 +741,10 @@ def controlled_proposed_model_complete() -> bool:
 
 
 # ====================================================================
-# STAGE 9 VALIDATION
+# STAGE 8 VALIDATION
 # ====================================================================
 
 def ablation_complete() -> bool:
-    """
-    Check whether the ablation study has completed.
-    """
 
     path = (
         REPORT_PATH
@@ -899,13 +782,10 @@ def ablation_complete() -> bool:
 
 
 # ====================================================================
-# STAGE 10 VALIDATION
+# STAGE 9 VALIDATION
 # ====================================================================
 
 def statistical_significance_complete() -> bool:
-    """
-    Check whether statistical significance analysis has completed.
-    """
 
     path = (
         REPORT_PATH
@@ -933,13 +813,10 @@ def statistical_significance_complete() -> bool:
 
 
 # ====================================================================
-# STAGE 11 VALIDATION
+# STAGE 10 VALIDATION
 # ====================================================================
 
 def thesis_tables_complete() -> bool:
-    """
-    Check whether all required thesis tables have been generated.
-    """
 
     required_tables = [
 
@@ -978,13 +855,10 @@ def thesis_tables_complete() -> bool:
 
 
 # ====================================================================
-# STAGE 12 VALIDATION
+# STAGE 11 VALIDATION
 # ====================================================================
 
 def final_report_complete() -> bool:
-    """
-    Check whether the final report exists and is non-empty.
-    """
 
     path = (
         REPORT_PATH
@@ -999,9 +873,6 @@ def final_report_complete() -> bool:
 # ====================================================================
 
 def display_pipeline_status() -> None:
-    """
-    Display the current state of every evaluation stage.
-    """
 
     print_header(
         "CURRENT EVALUATION PIPELINE STATUS"
@@ -1032,11 +903,6 @@ def display_pipeline_status() -> None:
         (
             "Uncertainty Statistics",
             uncertainty_statistics_complete(),
-        ),
-
-        (
-            "Common Seven-Method Comparison",
-            baseline_comparison_complete(),
         ),
 
         (
@@ -1118,13 +984,6 @@ def display_pipeline_status() -> None:
 # ====================================================================
 
 def run_training_if_required() -> None:
-    """
-    Train the model when RUN_TRAINING is enabled.
-
-    Actual training module:
-
-        train.train_model
-    """
 
     if not RUN_TRAINING:
 
@@ -1165,11 +1024,6 @@ def run_training_if_required() -> None:
 # ====================================================================
 
 def run_controlled_classical_baselines() -> None:
-    """
-    Execute all six classical controlled baseline experiments.
-
-    Each baseline uses the same controlled factorial design.
-    """
 
     for baseline in (
         CONTROLLED_CLASSICAL_BASELINES
@@ -1196,10 +1050,6 @@ def run_controlled_classical_baselines() -> None:
 # ====================================================================
 
 def run_controlled_proposed_model() -> None:
-    """
-    Execute the controlled experiment for the proposed
-    Physics-Informed 3D Encoder–Decoder model.
-    """
 
     run_module(
         PROPOSED_CONTROLLED_MODULE,
@@ -1212,9 +1062,6 @@ def run_controlled_proposed_model() -> None:
 # ====================================================================
 
 def main() -> None:
-    """
-    Execute the complete resumable evaluation pipeline.
-    """
 
     print_header(
         "PHYSICS-INFORMED 3D SEISMIC RECONSTRUCTION"
@@ -1283,24 +1130,12 @@ def main() -> None:
         f"{EXPECTED_CONTROLLED_CASES}"
     )
 
-    # ---------------------------------------------------------------
-    # Create output directory.
-    # ---------------------------------------------------------------
-
     REPORT_PATH.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    # ---------------------------------------------------------------
-    # Optional training.
-    # ---------------------------------------------------------------
-
     run_training_if_required()
-
-    # ---------------------------------------------------------------
-    # Checkpoint validation.
-    # ---------------------------------------------------------------
 
     print_header(
         "CHECKPOINT VALIDATION"
@@ -1323,15 +1158,7 @@ def main() -> None:
         "[VALID] best_model.pth"
     )
 
-    # ---------------------------------------------------------------
-    # Display current status.
-    # ---------------------------------------------------------------
-
     display_pipeline_status()
-
-    # ---------------------------------------------------------------
-    # Determine resume behaviour.
-    # ---------------------------------------------------------------
 
     resume = (
         RESUME_EVALUATION
@@ -1341,11 +1168,9 @@ def main() -> None:
     if FORCE_RERUN_EVALUATION:
 
         print()
-
         print(
             "FORCE_RERUN_EVALUATION = True"
         )
-
         print(
             "All evaluation stages will be executed again."
         )
@@ -1353,11 +1178,9 @@ def main() -> None:
     elif RESUME_EVALUATION:
 
         print()
-
         print(
             "RESUME_EVALUATION = True"
         )
-
         print(
             "Valid completed stages will be skipped."
         )
@@ -1365,11 +1188,9 @@ def main() -> None:
     else:
 
         print()
-
         print(
             "RESUME_EVALUATION = False"
         )
-
         print(
             "Evaluation stages will be executed."
         )
@@ -1500,37 +1321,11 @@ def main() -> None:
         )
 
     # =================================================================
-    # STAGE 6 — COMMON SEVEN-METHOD COMPARISON
+    # STAGE 6 — CONTROLLED CLASSICAL BASELINES
     # =================================================================
 
     print_stage(
         6,
-        "COMMON SEVEN-METHOD BASELINE COMPARISON",
-    )
-
-    if (
-        resume
-        and baseline_comparison_complete()
-    ):
-
-        print(
-            "[SKIPPED] Common seven-method comparison "
-            "already completed."
-        )
-
-    else:
-
-        run_module(
-            "evaluation.baselines.compare_with_baselines",
-            "Common seven-method reconstruction comparison",
-        )
-
-    # =================================================================
-    # STAGE 7 — CONTROLLED CLASSICAL BASELINES
-    # =================================================================
-
-    print_stage(
-        7,
         "CONTROLLED CLASSICAL BASELINES",
     )
 
@@ -1549,11 +1344,11 @@ def main() -> None:
         run_controlled_classical_baselines()
 
     # =================================================================
-    # STAGE 8 — CONTROLLED PROPOSED MODEL
+    # STAGE 7 — CONTROLLED PROPOSED MODEL
     # =================================================================
 
     print_stage(
-        8,
+        7,
         "CONTROLLED PROPOSED MODEL",
     )
 
@@ -1572,11 +1367,11 @@ def main() -> None:
         run_controlled_proposed_model()
 
     # =================================================================
-    # STAGE 9 — ABLATION STUDY
+    # STAGE 8 — ABLATION STUDY
     # =================================================================
 
     print_stage(
-        9,
+        8,
         "ABLATION STUDY",
     )
 
@@ -1597,11 +1392,11 @@ def main() -> None:
         )
 
     # =================================================================
-    # STAGE 10 — STATISTICAL SIGNIFICANCE
+    # STAGE 9 — STATISTICAL SIGNIFICANCE
     # =================================================================
 
     print_stage(
-        10,
+        9,
         "STATISTICAL SIGNIFICANCE",
     )
 
@@ -1623,11 +1418,11 @@ def main() -> None:
         )
 
     # =================================================================
-    # STAGE 11 — THESIS TABLES
+    # STAGE 10 — THESIS TABLES
     # =================================================================
 
     print_stage(
-        11,
+        10,
         "THESIS TABLES",
     )
 
@@ -1648,11 +1443,11 @@ def main() -> None:
         )
 
     # =================================================================
-    # STAGE 12 — FINAL REPORT
+    # STAGE 11 — FINAL REPORT
     # =================================================================
 
     print_stage(
-        12,
+        11,
         "FINAL REPORT",
     )
 
@@ -1671,10 +1466,6 @@ def main() -> None:
             "evaluation.final_report",
             "Final report generation",
         )
-
-    # =================================================================
-    # FINAL STATUS
-    # =================================================================
 
     display_pipeline_status()
 
@@ -1710,15 +1501,6 @@ def main() -> None:
 # ====================================================================
 
 def run_full_evaluation() -> None:
-    """
-    Public entry point for the project master script.
-
-    This allows:
-
-        from evaluation.run_full_evaluation import run_full_evaluation
-
-    to work correctly.
-    """
 
     main()
 
