@@ -393,27 +393,97 @@ def validate_model_device(
 ):
     """
     Verify that parameters and buffers are on the expected device.
+
+    CUDA NOTE
+    ---------
+    torch.device("cuda") and torch.device("cuda:0") refer to the
+    same active CUDA device when CUDA device index 0 is active, but
+    they are represented differently by PyTorch.
+
+    Therefore, when the expected device is CUDA without an explicit
+    index, resolve it to the currently active CUDA device before
+    comparing model parameters and buffers.
+
+    This prevents a false device-mismatch error such as:
+
+        expected: cuda
+        actual:   cuda:0
+
+    while still detecting genuine CPU/CUDA or CUDA-device mismatches.
     """
 
     expected_device = torch.device(device)
 
+    # -------------------------------------------------------------
+    # Normalize an unspecified CUDA device.
+    #
+    # Example:
+    #
+    #     cuda   -> cuda:0
+    #
+    # This is the critical correction.
+    # -------------------------------------------------------------
+
+    if expected_device.type == "cuda":
+
+        if not torch.cuda.is_available():
+
+            raise RuntimeError(
+                "CUDA device validation requested, but CUDA "
+                "is not available."
+            )
+
+        if expected_device.index is None:
+
+            expected_device = torch.device(
+                f"cuda:{torch.cuda.current_device()}"
+            )
+
+    # -------------------------------------------------------------
+    # Validate model parameters.
+    # -------------------------------------------------------------
+
     for name, parameter in model.named_parameters():
 
-        if parameter.device != expected_device:
+        actual_device = parameter.device
+
+        if actual_device.type == "cuda":
+
+            if actual_device.index is None:
+
+                actual_device = torch.device(
+                    f"cuda:{torch.cuda.current_device()}"
+                )
+
+        if actual_device != expected_device:
 
             raise RuntimeError(
                 f"Model parameter '{name}' is on "
-                f"{parameter.device}, expected "
+                f"{actual_device}, expected "
                 f"{expected_device}."
             )
 
+    # -------------------------------------------------------------
+    # Validate model buffers.
+    # -------------------------------------------------------------
+
     for name, buffer in model.named_buffers():
 
-        if buffer.device != expected_device:
+        actual_device = buffer.device
+
+        if actual_device.type == "cuda":
+
+            if actual_device.index is None:
+
+                actual_device = torch.device(
+                    f"cuda:{torch.cuda.current_device()}"
+                )
+
+        if actual_device != expected_device:
 
             raise RuntimeError(
                 f"Model buffer '{name}' is on "
-                f"{buffer.device}, expected "
+                f"{actual_device}, expected "
                 f"{expected_device}."
             )
 
@@ -617,9 +687,25 @@ def evaluate_checkpoint(
             "mask",
         )
 
-        input_cube = input_cube.to(device)
-        target_cube = target_cube.to(device)
-        mask = mask.to(device)
+        # -------------------------------------------------------------
+        # Explicitly place all evaluation tensors on the resolved
+        # device.
+        # -------------------------------------------------------------
+
+        input_cube = input_cube.to(
+            device=device,
+            non_blocking=False,
+        )
+
+        target_cube = target_cube.to(
+            device=device,
+            non_blocking=False,
+        )
+
+        mask = mask.to(
+            device=device,
+            non_blocking=False,
+        )
 
         if input_cube.shape != target_cube.shape:
 
@@ -666,7 +752,10 @@ def evaluate_checkpoint(
             "reconstruction",
         )
 
-        reconstruction = reconstruction.to(device)
+        reconstruction = reconstruction.to(
+            device=device,
+            non_blocking=False,
+        )
 
         if reconstruction.shape != target_cube.shape:
 
@@ -1755,6 +1844,14 @@ def run_ablation():
         device,
     )
 
+    # Display the concrete CUDA device when applicable.
+    if device.type == "cuda":
+
+        print(
+            "Active CUDA Device:",
+            torch.cuda.current_device(),
+        )
+
     # =================================================================
     # BUILD DATASET
     # =================================================================
@@ -2073,6 +2170,11 @@ def run_ablation():
 
         evaluation_model = build_ablation_model(
             settings,
+            device,
+        )
+
+        validate_model_device(
+            evaluation_model,
             device,
         )
 

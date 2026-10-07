@@ -151,28 +151,6 @@ from utils.config import (
 # ====================================================================
 # PROJECT PATHS
 # ====================================================================
-#
-# IMPORTANT:
-#
-# Do NOT construct project paths relative to this evaluation script.
-#
-# The project uses centralized paths in utils/config.py.
-#
-# Therefore:
-#
-#     CHECKPOINT_DIR
-#     REPORT_DIR
-#
-# are used directly.
-#
-# This prevents the previous error:
-#
-#     evaluation/outputs/...
-#
-# instead of:
-#
-#     outputs/...
-# ====================================================================
 
 CHECKPOINT = (
     Path(CHECKPOINT_DIR)
@@ -185,59 +163,38 @@ CHECKPOINT = (
 # ====================================================================
 
 GEOLOGICAL_MODES = [
-
     "horizontal",
-
     "dipping",
-
     "faulted",
-
     "folded",
-
     "complex",
-
     "highly_complex",
 ]
 
 
 MASK_MODES = [
-
     "random_voxels",
-
     "missing_traces",
-
     "missing_inlines",
-
     "missing_crosslines",
-
     "missing_blocks",
 ]
 
 
 MISSING_RATES = [
-
     0.10,
-
     0.20,
-
     0.30,
-
     0.40,
-
     0.50,
 ]
 
 
 SEEDS = [
-
     42,
-
     43,
-
     44,
-
     45,
-
     46,
 ]
 
@@ -245,27 +202,9 @@ SEEDS = [
 # ====================================================================
 # CUBE CONFIGURATION
 # ====================================================================
-#
-# The controlled matrix uses the same cube configuration as the
-# baseline experiments.
-#
-# Expected:
-#
-#     (64, 128, 128)
-#
-# Tensor convention:
-#
-#     [C, D, H, W]
-#
-# Network convention:
-#
-#     [B, C, D, H, W]
-# ====================================================================
 
 CUBE_SIZE = tuple(
-
     BASELINE_CUBE_SIZE
-
 )
 
 
@@ -274,9 +213,7 @@ CUBE_SIZE = tuple(
 # ====================================================================
 
 NUM_SAMPLES = int(
-
     BASELINE_NUM_SAMPLES
-
 )
 
 
@@ -285,9 +222,7 @@ NUM_SAMPLES = int(
 # ====================================================================
 
 MC_SAMPLES = int(
-
     MC_DROPOUT_SAMPLES
-
 )
 
 
@@ -296,18 +231,13 @@ MC_SAMPLES = int(
 # ====================================================================
 
 REPORT_DIR = Path(
-
     REPORT_DIR
-
 )
 
 
 REPORT_DIR.mkdir(
-
     parents=True,
-
     exist_ok=True
-
 )
 
 
@@ -316,20 +246,16 @@ REPORT_DIR.mkdir(
 # ====================================================================
 
 RESULTS_FILE = (
-
     REPORT_DIR
     /
     "proposed_model_controlled_matrix.csv"
-
 )
 
 
 SUMMARY_FILE = (
-
     REPORT_DIR
     /
     "proposed_model_controlled_matrix_summary.csv"
-
 )
 
 
@@ -338,26 +264,18 @@ SUMMARY_FILE = (
 # ====================================================================
 
 PRESERVATION_TOLERANCE = float(
-
     OBSERVED_PRESERVATION_TOLERANCE
-
 )
 
 
 # ====================================================================
 # DEVICE
 # ====================================================================
-#
-# CUDA is automatically selected when available.
-# Otherwise CPU is used.
-# ====================================================================
 
 DEVICE = torch.device(
-
     "cuda"
     if torch.cuda.is_available()
     else "cpu"
-
 )
 
 
@@ -368,11 +286,6 @@ DEVICE = torch.device(
 def set_seed(seed):
     """
     Set deterministic random seeds.
-
-    Parameters
-    ----------
-    seed : int
-        Random seed used for the controlled experiment.
     """
 
     random.seed(seed)
@@ -393,34 +306,20 @@ def set_seed(seed):
 def metric_to_float(value):
     """
     Convert a metric output to a Python float.
-
-    Parameters
-    ----------
-    value :
-        Tensor, NumPy array, or scalar metric value.
-
-    Returns
-    -------
-    float
-        Converted metric value.
     """
 
     if isinstance(value, torch.Tensor):
 
         return float(
-
             value.detach()
             .cpu()
             .item()
-
         )
 
     if isinstance(value, np.ndarray):
 
         return float(
-
             value.item()
-
         )
 
     return float(value)
@@ -433,24 +332,12 @@ def metric_to_float(value):
 def tensor_is_finite(tensor):
     """
     Return True when all tensor values are finite.
-
-    Parameters
-    ----------
-    tensor : torch.Tensor
-        Tensor to validate.
-
-    Returns
-    -------
-    bool
-        True when no NaN or Inf values are present.
     """
 
     return bool(
-
         torch.isfinite(tensor)
         .all()
         .item()
-
     )
 
 
@@ -461,14 +348,7 @@ def tensor_is_finite(tensor):
 def load_model():
     """
     Load the frozen production Network3D checkpoint.
-
-    The model architecture corresponds to the trained proposed
-    Physics-Informed 3D Encoder-Decoder framework.
     """
-
-    # ------------------------------------------------------------
-    # Verify checkpoint
-    # ------------------------------------------------------------
 
     if not CHECKPOINT.is_file():
 
@@ -489,168 +369,84 @@ def load_model():
 
 
     print()
-
+    print("=" * 70)
+    print("LOADING FROZEN PROPOSED MODEL")
     print("=" * 70)
 
-    print(
-
-        "LOADING FROZEN PROPOSED MODEL"
-
-    )
-
-    print("=" * 70)
-
+    print()
+    print("Checkpoint:")
+    print(CHECKPOINT)
 
     print()
+    print("Device:")
+    print(DEVICE)
 
-    print(
-
-        "Checkpoint:"
-
-    )
-
-    print(
-
-        CHECKPOINT
-
-    )
-
-
-    print()
-
-    print(
-
-        "Device:"
-
-    )
-
-    print(
-
-        DEVICE
-
-    )
-
-
-    # ------------------------------------------------------------
-    # Production architecture
-    # ------------------------------------------------------------
 
     model = Network3D(
-
         use_attention=USE_ATTENTION,
-
         use_residual=USE_RESIDUAL,
-
         use_uncertainty=USE_UNCERTAINTY
-
     )
 
 
     model = model.to(
-
         DEVICE
-
     )
 
-
-    # ------------------------------------------------------------
-    # Load checkpoint
-    # ------------------------------------------------------------
 
     checkpoint = torch.load(
-
         CHECKPOINT,
-
         map_location=DEVICE
-
     )
 
 
-    # ------------------------------------------------------------
-    # Validate checkpoint structure
-    # ------------------------------------------------------------
-
     if not isinstance(
-
         checkpoint,
-
         dict
-
     ):
 
         raise TypeError(
-
             "Unexpected checkpoint format. "
             "Expected a dictionary containing "
             "'model_state_dict'."
-
         )
 
 
     if "model_state_dict" not in checkpoint:
 
         raise KeyError(
-
             "Checkpoint does not contain "
             "'model_state_dict'."
-
         )
 
 
-    # ------------------------------------------------------------
-    # Load model parameters
-    # ------------------------------------------------------------
-
     model.load_state_dict(
-
         checkpoint[
-
             "model_state_dict"
-
         ]
-
     )
 
-
-    # ------------------------------------------------------------
-    # Evaluation mode
-    # ------------------------------------------------------------
 
     model.eval()
 
 
     print()
-
-    print(
-
-        "Proposed model loaded successfully."
-
-    )
+    print("Proposed model loaded successfully.")
 
 
     if "best_epoch" in checkpoint:
 
         print(
-
             "Best epoch:",
-
-            checkpoint[
-                "best_epoch"
-            ]
-
+            checkpoint["best_epoch"]
         )
 
 
     if "best_validation_loss" in checkpoint:
 
         print(
-
             "Best validation loss:",
-
-            checkpoint[
-                "best_validation_loss"
-            ]
-
+            checkpoint["best_validation_loss"]
         )
 
 
@@ -670,30 +466,6 @@ def run_single_experiment(
 ):
     """
     Run one controlled proposed-model experiment.
-
-    The neural network is frozen.
-
-    Parameters
-    ----------
-    model : torch.nn.Module
-        Frozen proposed model.
-
-    geological_mode : str
-        Controlled geological setting.
-
-    mask_mode : str
-        Controlled missing-data mechanism.
-
-    missing_rate : float
-        Requested missing-data rate.
-
-    seed : int
-        Deterministic experiment seed.
-
-    Returns
-    -------
-    dict
-        Complete experimental result record.
     """
 
     # ================================================================
@@ -773,7 +545,9 @@ def run_single_experiment(
         *CUBE_SIZE
     )
 
+
     if tuple(corrupted.shape) != expected_shape:
+
         raise RuntimeError(
 
             "Unexpected corrupted cube shape: "
@@ -784,30 +558,25 @@ def run_single_experiment(
 
         )
 
+
     if corrupted.shape != target.shape:
 
         raise RuntimeError(
-
             "Corrupted and target shapes differ."
-
         )
 
 
     if corrupted.shape != mask.shape:
 
         raise RuntimeError(
-
             "Corrupted and mask shapes differ."
-
         )
 
 
     if corrupted.shape != velocity.shape:
 
         raise RuntimeError(
-
             "Corrupted and velocity shapes differ."
-
         )
 
 
@@ -833,17 +602,13 @@ def run_single_experiment(
 
 
     for name, tensor in (
-
         tensors_to_validate.items()
-
     ):
 
         if not tensor_is_finite(tensor):
 
             raise RuntimeError(
-
                 f"{name} contains NaN or Inf."
-
             )
 
 
@@ -857,68 +622,39 @@ def run_single_experiment(
     for value in unique_values.tolist():
 
         if float(value) not in {
-
             0.0,
-
             1.0
-
         }:
 
             raise RuntimeError(
-
                 "Mask contains values other than "
                 "0 and 1."
-
             )
 
 
     # ================================================================
     # INPUT CONSISTENCY
     # ================================================================
-    #
-    # The synthetic dataset defines:
-    #
-    #     corrupted = target * mask
-    #
-    # where:
-    #
-    #     mask = 1 -> observed
-    #     mask = 0 -> missing
-    # ================================================================
 
     expected_input = (
-
         target
-
         *
-
         mask
-
     )
 
 
     input_difference = torch.max(
 
         torch.abs(
-
             corrupted
-
             -
-
             expected_input
-
         )
 
     ).item()
 
 
-    if (
-
-        input_difference
-        >
-        PRESERVATION_TOLERANCE
-
-    ):
+    if input_difference > PRESERVATION_TOLERANCE:
 
         raise RuntimeError(
 
@@ -936,9 +672,7 @@ def run_single_experiment(
     observed_samples = int(
 
         torch.sum(
-
             mask == 1
-
         ).item()
 
     )
@@ -947,9 +681,7 @@ def run_single_experiment(
     missing_samples = int(
 
         torch.sum(
-
             mask == 0
-
         ).item()
 
     )
@@ -958,55 +690,97 @@ def run_single_experiment(
     if missing_samples == 0:
 
         raise RuntimeError(
-
             "No missing samples detected."
-
         )
 
 
     total_samples = (
-
         observed_samples
         +
         missing_samples
-
     )
 
 
     measured_missing_rate = (
-
         missing_samples
         /
         total_samples
-
     )
+
+
+    # ================================================================
+    # MOVE CONTROLLED-EXPERIMENT TENSORS TO COMPUTATION DEVICE
+    # ================================================================
+    #
+    # Dataset tensors are initially created on CPU.
+    #
+    # All dataset validation above is deliberately performed before
+    # this transfer.
+    #
+    # From this point onward, tensors participating in inference,
+    # reconstruction, uncertainty evaluation, and metric calculation
+    # are placed on the same computation device as the model.
+    #
+    # Dataset convention:
+    #
+    #     [C,D,H,W]
+    #
+    # Network convention:
+    #
+    #     [B,C,D,H,W]
+    # ================================================================
+
+    corrupted = corrupted.to(DEVICE)
+
+    target = target.to(DEVICE)
+
+    mask = mask.to(DEVICE)
+
+    velocity = velocity.to(DEVICE)
+
+
+    # ================================================================
+    # DEVICE CONSISTENCY VALIDATION
+    # ================================================================
+
+    experiment_tensors = {
+
+        "corrupted":
+            corrupted,
+
+        "target":
+            target,
+
+        "mask":
+            mask,
+
+        "velocity":
+            velocity
+
+    }
+
+
+    for name, tensor in experiment_tensors.items():
+
+        if tensor.device != DEVICE:
+
+            raise RuntimeError(
+
+                f"Device mismatch for {name}: "
+
+                f"expected={DEVICE}, "
+
+                f"received={tensor.device}"
+
+            )
 
 
     # ================================================================
     # PREPARE NETWORK INPUT
     # ================================================================
-    #
-    # Dataset:
-    #
-    #     [C,D,H,W]
-    #
-    # Network:
-    #
-    #     [B,C,D,H,W]
-    #
-    # Therefore:
-    #
-    #     [1,1,64,128,128]
-    # ================================================================
 
     input_batch = (
-
-        corrupted
-
-        .unsqueeze(0)
-
-        .to(DEVICE)
-
+        corrupted.unsqueeze(0)
     )
 
 
@@ -1031,9 +805,7 @@ def run_single_experiment(
 
 
     predictions = predictor.predict(
-
         input_batch
-
     )
 
 
@@ -1041,11 +813,9 @@ def run_single_experiment(
 
 
     runtime_seconds = (
-
         end_time
         -
         start_time
-
     )
 
 
@@ -1063,11 +833,9 @@ def run_single_experiment(
 
 
     missing_keys = (
-
         required_keys
         -
         predictions.keys()
-
     )
 
 
@@ -1083,20 +851,16 @@ def run_single_experiment(
 
 
     reconstruction_samples = (
-
         predictions[
             "reconstruction_samples"
         ]
-
     )
 
 
     log_variance_samples = (
-
         predictions[
             "log_variance_samples"
         ]
-
     )
 
 
@@ -1105,62 +869,44 @@ def run_single_experiment(
     # ================================================================
 
     if not isinstance(
-
         reconstruction_samples,
-
         torch.Tensor
-
     ):
 
         raise TypeError(
-
             "reconstruction_samples must be "
             "a torch.Tensor."
-
         )
 
 
     if not isinstance(
-
         log_variance_samples,
-
         torch.Tensor
-
     ):
 
         raise TypeError(
-
             "log_variance_samples must be "
             "a torch.Tensor."
-
         )
 
 
     if not tensor_is_finite(
-
         reconstruction_samples
-
     ):
 
         raise RuntimeError(
-
             "reconstruction_samples contains "
             "NaN or Inf."
-
         )
 
 
     if not tensor_is_finite(
-
         log_variance_samples
-
     ):
 
         raise RuntimeError(
-
             "log_variance_samples contains "
             "NaN or Inf."
-
         )
 
 
@@ -1169,11 +915,9 @@ def run_single_experiment(
     # ================================================================
 
     if (
-
         reconstruction_samples.shape[0]
         !=
         MC_SAMPLES
-
     ):
 
         raise RuntimeError(
@@ -1188,11 +932,9 @@ def run_single_experiment(
 
 
     if (
-
         log_variance_samples.shape[0]
         !=
         MC_SAMPLES
-
     ):
 
         raise RuntimeError(
@@ -1211,54 +953,29 @@ def run_single_experiment(
     # ================================================================
 
     reconstruction_mean = (
-
         reconstruction_samples.mean(
-
             dim=0
-
         )
-
     )
 
 
     # ================================================================
     # PREDICTIVE UNCERTAINTY ESTIMATOR
     # ================================================================
-    #
-    # IMPORTANT:
-    #
-    # PredictiveUncertaintyEstimator is an INSTANCE class.
-    #
-    # It must NOT be used as:
-    #
-    #     PredictiveUncertaintyEstimator.aleatoric_variance(...)
-    #
-    # Instead it is instantiated and called through forward().
-    # ================================================================
 
     uncertainty_estimator = (
-
         PredictiveUncertaintyEstimator(
-
             min_log_variance=LOG_VARIANCE_MIN,
-
             max_log_variance=LOG_VARIANCE_MAX
-
         )
-
     )
 
 
     uncertainty_results = (
-
         uncertainty_estimator(
-
             log_variance_samples,
-
             reconstruction_samples
-
         )
-
     )
 
 
@@ -1280,11 +997,9 @@ def run_single_experiment(
 
 
     missing_uncertainty_keys = (
-
         required_uncertainty_keys
         -
         uncertainty_results.keys()
-
     )
 
 
@@ -1300,38 +1015,30 @@ def run_single_experiment(
 
 
     aleatoric_variance = (
-
         uncertainty_results[
             "aleatoric_variance"
         ]
-
     )
 
 
     epistemic_variance = (
-
         uncertainty_results[
             "epistemic_variance"
         ]
-
     )
 
 
     predictive_variance = (
-
         uncertainty_results[
             "predictive_variance"
         ]
-
     )
 
 
     predictive_std = (
-
         uncertainty_results[
             "predictive_std"
         ]
-
     )
 
 
@@ -1340,9 +1047,7 @@ def run_single_experiment(
     # ================================================================
 
     expected_uncertainty_shape = (
-
         reconstruction_mean.shape
-
     )
 
 
@@ -1364,15 +1069,11 @@ def run_single_experiment(
 
 
     for name, tensor in (
-
         uncertainty_tensors.items()
-
     ):
 
         if tuple(tensor.shape) != tuple(
-
             expected_uncertainty_shape
-
         ):
 
             raise RuntimeError(
@@ -1391,17 +1092,13 @@ def run_single_experiment(
     # ================================================================
 
     for name, tensor in (
-
         uncertainty_tensors.items()
-
     ):
 
         if not tensor_is_finite(tensor):
 
             raise RuntimeError(
-
                 f"{name} contains NaN or Inf."
-
             )
 
 
@@ -1410,70 +1107,43 @@ def run_single_experiment(
     # ================================================================
 
     if (
-
         aleatoric_variance < 0
-
     ).any():
 
         raise RuntimeError(
-
             "Negative aleatoric variance detected."
-
         )
 
 
     if (
-
         epistemic_variance < 0
-
     ).any():
 
         raise RuntimeError(
-
             "Negative epistemic variance detected."
-
         )
 
 
     if (
-
         predictive_variance < 0
-
     ).any():
 
         raise RuntimeError(
-
             "Negative predictive variance detected."
-
         )
 
 
     if (
-
         predictive_std < 0
-
     ).any():
 
         raise RuntimeError(
-
             "Negative predictive standard deviation detected."
-
         )
 
 
     # ================================================================
     # PREDICTIVE VARIANCE DECOMPOSITION CHECK
-    # ================================================================
-    #
-    # Predictive variance should satisfy:
-    #
-    #     predictive variance
-    #         =
-    #     aleatoric variance
-    #         +
-    #     epistemic variance
-    #
-    # within numerical precision.
     # ================================================================
 
     decomposition_error = torch.max(
@@ -1481,17 +1151,11 @@ def run_single_experiment(
         torch.abs(
 
             predictive_variance
-
             -
-
             (
-
                 aleatoric_variance
-
                 +
-
                 epistemic_variance
-
             )
 
         )
@@ -1513,26 +1177,9 @@ def run_single_experiment(
     # ================================================================
     # DATA CONSISTENCY PROJECTION
     # ================================================================
-    #
-    # Restore observed seismic samples exactly.
-    #
-    # This guarantees:
-    #
-    #     reconstruction[mask == 1]
-    #         =
-    #     corrupted[mask == 1]
-    #
-    # The uncertainty fields are intentionally NOT modified.
-    #
-    # This is an evaluation-time data-consistency projection.
-    # ================================================================
 
     mask_batch = (
-
-        mask
-
-        .unsqueeze(0)
-
+        mask.unsqueeze(0)
     )
 
 
@@ -1541,15 +1188,10 @@ def run_single_experiment(
         reconstruction_mean
 
         *
-
         (
-
             1.0
-
             -
-
             mask_batch
-
         )
 
         +
@@ -1557,7 +1199,6 @@ def run_single_experiment(
         corrupted.unsqueeze(0)
 
         *
-
         mask_batch
 
     )
@@ -1568,16 +1209,12 @@ def run_single_experiment(
     # ================================================================
 
     if not tensor_is_finite(
-
         reconstruction
-
     ):
 
         raise RuntimeError(
-
             "Final reconstruction contains "
             "NaN or Inf."
-
         )
 
 
@@ -1586,9 +1223,7 @@ def run_single_experiment(
     # ================================================================
 
     observed_selector = (
-
         mask_batch == 1
-
     )
 
 
@@ -1611,13 +1246,7 @@ def run_single_experiment(
     ).item()
 
 
-    if (
-
-        observed_difference
-        >
-        PRESERVATION_TOLERANCE
-
-    ):
+    if observed_difference > PRESERVATION_TOLERANCE:
 
         raise RuntimeError(
 
@@ -1633,9 +1262,7 @@ def run_single_experiment(
     # ================================================================
 
     missing_selector = (
-
         mask_batch == 0
-
     )
 
 
@@ -1644,39 +1271,31 @@ def run_single_experiment(
     # ================================================================
 
     missing_prediction = (
-
         reconstruction[
             missing_selector
         ]
-
     )
 
 
     missing_target = (
-
         target.unsqueeze(0)[
             missing_selector
         ]
-
     )
 
 
     if missing_prediction.numel() == 0:
 
         raise RuntimeError(
-
             "Missing-region metric selector "
             "contains zero elements."
-
         )
 
 
     missing_error = (
-
         missing_prediction
         -
         missing_target
-
     )
 
 
@@ -1685,9 +1304,7 @@ def run_single_experiment(
         torch.mean(
 
             torch.abs(
-
                 missing_error
-
             )
 
         ).item()
@@ -1700,9 +1317,7 @@ def run_single_experiment(
         torch.sqrt(
 
             torch.mean(
-
                 missing_error ** 2
-
             )
 
         ).item()
@@ -1713,40 +1328,20 @@ def run_single_experiment(
     # ================================================================
     # GLOBAL METRICS
     # ================================================================
-    #
-    # Canonical metric API expects:
-    #
-    #     [B,C,D,H,W]
-    # ================================================================
 
     target_batch = (
-
-        target
-
-        .unsqueeze(0)
-
-        .to(DEVICE)
-
+        target.unsqueeze(0)
     )
 
 
-    reconstruction_batch = (
-
-        reconstruction
-
-        .to(DEVICE)
-
-    )
+    reconstruction_batch = reconstruction
 
 
     metric_mae = metric_to_float(
 
         mae(
-
             reconstruction_batch,
-
             target_batch
-
         )
 
     )
@@ -1755,11 +1350,8 @@ def run_single_experiment(
     metric_rmse = metric_to_float(
 
         rmse(
-
             reconstruction_batch,
-
             target_batch
-
         )
 
     )
@@ -1768,11 +1360,8 @@ def run_single_experiment(
     metric_psnr = metric_to_float(
 
         psnr(
-
             reconstruction_batch,
-
             target_batch
-
         )
 
     )
@@ -1781,11 +1370,8 @@ def run_single_experiment(
     metric_snr = metric_to_float(
 
         snr(
-
             reconstruction_batch,
-
             target_batch
-
         )
 
     )
@@ -1794,11 +1380,8 @@ def run_single_experiment(
     metric_ssim = metric_to_float(
 
         ssim(
-
             reconstruction_batch,
-
             target_batch
-
         )
 
     )
@@ -1809,46 +1392,30 @@ def run_single_experiment(
     # ================================================================
 
     mean_aleatoric = float(
-
         aleatoric_variance
-
         .mean()
-
         .item()
-
     )
 
 
     mean_epistemic = float(
-
         epistemic_variance
-
         .mean()
-
         .item()
-
     )
 
 
     mean_predictive = float(
-
         predictive_variance
-
         .mean()
-
         .item()
-
     )
 
 
     mean_predictive_std = float(
-
         predictive_std
-
         .mean()
-
         .item()
-
     )
 
 
@@ -1857,54 +1424,38 @@ def run_single_experiment(
     # ================================================================
 
     missing_aleatoric = float(
-
         aleatoric_variance[
             missing_selector
         ]
-
         .mean()
-
         .item()
-
     )
 
 
     missing_epistemic = float(
-
         epistemic_variance[
             missing_selector
         ]
-
         .mean()
-
         .item()
-
     )
 
 
     missing_predictive = float(
-
         predictive_variance[
             missing_selector
         ]
-
         .mean()
-
         .item()
-
     )
 
 
     missing_predictive_std = float(
-
         predictive_std[
             missing_selector
         ]
-
         .mean()
-
         .item()
-
     )
 
 
@@ -2024,9 +1575,6 @@ def calculate_summary(records):
         geological_mode
         mask_mode
         requested_missing_rate
-
-    The seed dimension is summarized through n_seeds and the
-    corresponding standard deviations.
     """
 
     grouped = {}
@@ -2052,15 +1600,10 @@ def calculate_summary(records):
 
 
         grouped.setdefault(
-
             key,
-
             []
-
         ).append(
-
             record
-
         )
 
 
@@ -2112,7 +1655,6 @@ def calculate_summary(records):
             geological_mode,
             mask_mode,
             missing_rate
-
         ) = key
 
 
@@ -2140,11 +1682,9 @@ def calculate_summary(records):
                 [
 
                     float(
-
                         record[
                             metric_name
                         ]
-
                     )
 
                     for record in group
@@ -2157,39 +1697,28 @@ def calculate_summary(records):
 
 
             summary[
-
                 f"{metric_name}_mean"
-
             ] = float(
-
                 values.mean()
-
             )
 
 
             summary[
-
                 f"{metric_name}_std"
-
             ] = float(
 
                 values.std(
-
                     ddof=1
-
                 )
 
                 if len(values) > 1
-
                 else 0.0
 
             )
 
 
         summaries.append(
-
             summary
-
         )
 
 
@@ -2209,35 +1738,24 @@ def write_csv(
     """
 
     if not records:
-
         return
 
 
     fieldnames = list(
-
         records[0].keys()
-
     )
 
 
     with open(
-
         filename,
-
         "w",
-
         newline="",
-
         encoding="utf-8"
-
     ) as file:
 
         writer = csv.DictWriter(
-
             file,
-
             fieldnames=fieldnames
-
         )
 
 
@@ -2245,9 +1763,7 @@ def write_csv(
 
 
         writer.writerows(
-
             records
-
         )
 
 
@@ -2259,11 +1775,6 @@ def build_controlled_cases():
     """
     Construct the complete deterministic controlled experimental
     matrix.
-
-    Returns
-    -------
-    list
-        Complete 750-case experimental matrix.
     """
 
     cases = []
@@ -2280,15 +1791,10 @@ def build_controlled_cases():
                     cases.append(
 
                         (
-
                             geological_mode,
-
                             mask_mode,
-
                             missing_rate,
-
                             seed
-
                         )
 
                     )
@@ -2306,67 +1812,39 @@ def select_cases_for_execution(
 ):
     """
     Select the controlled cases that will actually be executed.
-
-    The full matrix is constructed first. The execution limit only
-    controls how many of those already-defined cases are run.
     """
 
     full_matrix_size = len(cases)
 
-
-    # ------------------------------------------------------------
-    # FULL EXPERIMENT
-    # ------------------------------------------------------------
 
     if CONTROLLED_MATRIX_CASE_LIMIT is None:
 
         return cases
 
 
-    # ------------------------------------------------------------
-    # VALIDATE LIMIT TYPE
-    # ------------------------------------------------------------
-
     if not isinstance(
-
         CONTROLLED_MATRIX_CASE_LIMIT,
-
         int
-
     ):
 
         raise TypeError(
-
             "CONTROLLED_MATRIX_CASE_LIMIT must be "
             "an integer or None."
-
         )
 
-
-    # ------------------------------------------------------------
-    # VALIDATE LOWER BOUND
-    # ------------------------------------------------------------
 
     if CONTROLLED_MATRIX_CASE_LIMIT < 1:
 
         raise ValueError(
-
             "CONTROLLED_MATRIX_CASE_LIMIT must be "
             "greater than or equal to 1."
-
         )
 
 
-    # ------------------------------------------------------------
-    # VALIDATE UPPER BOUND
-    # ------------------------------------------------------------
-
     if (
-
         CONTROLLED_MATRIX_CASE_LIMIT
         >
         full_matrix_size
-
     ):
 
         raise ValueError(
@@ -2377,14 +1855,8 @@ def select_cases_for_execution(
         )
 
 
-    # ------------------------------------------------------------
-    # DETERMINISTIC SELECTION
-    # ------------------------------------------------------------
-
     return cases[
-
         :CONTROLLED_MATRIX_CASE_LIMIT
-
     ]
 
 
@@ -2395,15 +1867,8 @@ def select_cases_for_execution(
 def main():
 
     print()
-
     print("=" * 78)
-
-    print(
-
-        "PROPOSED MODEL CONTROLLED EXPERIMENTAL MATRIX"
-
-    )
-
+    print("PROPOSED MODEL CONTROLLED EXPERIMENTAL MATRIX")
     print("=" * 78)
 
 
@@ -2417,17 +1882,11 @@ def main():
     expected_cases = (
 
         len(GEOLOGICAL_MODES)
-
         *
-
         len(MASK_MODES)
-
         *
-
         len(MISSING_RATES)
-
         *
-
         len(SEEDS)
 
     )
@@ -2469,16 +1928,12 @@ def main():
     # ================================================================
 
     cases_to_run = select_cases_for_execution(
-
         cases
-
     )
 
 
     cases_to_execute = len(
-
         cases_to_run
-
     )
 
 
@@ -2489,17 +1944,13 @@ def main():
     if CONTROLLED_MATRIX_CASE_LIMIT is None:
 
         execution_mode = (
-
             "FULL CONTROLLED MATRIX"
-
         )
 
     else:
 
         execution_mode = (
-
             "SMOKE TEST"
-
         )
 
 
@@ -2508,87 +1959,44 @@ def main():
     # ================================================================
 
     print()
-
     print(
-
         f"Full matrix cases : "
         f"{expected_cases}"
-
     )
 
-
     print(
-
         f"Cases to run      : "
         f"{cases_to_execute}"
-
     )
 
-
     print(
-
         f"Execution mode    : "
         f"{execution_mode}"
-
     )
 
-
     print()
-
     print(
-
         f"Cube size         : "
         f"{CUBE_SIZE}"
-
     )
 
-
     print(
-
         f"Device            : "
         f"{DEVICE}"
-
     )
 
-
     print(
-
         f"MC samples        : "
         f"{MC_SAMPLES}"
-
     )
-
 
     print()
-
-    print(
-
-        "Checkpoint:"
-
-    )
-
-
-    print(
-
-        CHECKPOINT
-
-    )
-
+    print("Checkpoint:")
+    print(CHECKPOINT)
 
     print()
-
-    print(
-
-        "Results directory:"
-
-    )
-
-
-    print(
-
-        REPORT_DIR
-
-    )
+    print("Results directory:")
+    print(REPORT_DIR)
 
 
     # ================================================================
@@ -2609,13 +2017,6 @@ def main():
     # ================================================================
     # LOAD MODEL ONCE
     # ================================================================
-    #
-    # IMPORTANT:
-    #
-    # The same frozen model is used for every case.
-    #
-    # There is NO retraining inside this loop.
-    # ================================================================
 
     model = load_model()
 
@@ -2625,7 +2026,6 @@ def main():
     # ================================================================
 
     records = []
-
 
     completed_cases = 0
 
@@ -2639,68 +2039,47 @@ def main():
     # ================================================================
 
     for (
-
         geological_mode,
-
         mask_mode,
-
         missing_rate,
-
         seed
-
     ) in cases_to_run:
-
 
         completed_cases += 1
 
 
         print()
-
-        print(
-
-            "-" * 78
-
-        )
+        print("-" * 78)
 
 
         print(
-
             f"Case "
             f"{completed_cases}/"
             f"{cases_to_execute}"
-
         )
 
 
         print(
-
             f"Geology       : "
             f"{geological_mode}"
-
         )
 
 
         print(
-
             f"Mask          : "
             f"{mask_mode}"
-
         )
 
 
         print(
-
             f"Missing rate  : "
             f"{missing_rate:.0%}"
-
         )
 
 
         print(
-
             f"Seed          : "
             f"{seed}"
-
         )
 
 
@@ -2710,25 +2089,21 @@ def main():
 
         try:
 
-            result = (
+            result = run_single_experiment(
 
-                run_single_experiment(
+                model=model,
 
-                    model=model,
+                geological_mode=
+                    geological_mode,
 
-                    geological_mode=
-                        geological_mode,
+                mask_mode=
+                    mask_mode,
 
-                    mask_mode=
-                        mask_mode,
+                missing_rate=
+                    missing_rate,
 
-                    missing_rate=
-                        missing_rate,
-
-                    seed=
-                        seed
-
-                )
+                seed=
+                    seed
 
             )
 
@@ -2737,115 +2112,84 @@ def main():
 
 
             print()
-
-            print(
-
-                "Status        : SUCCESS"
-
-            )
+            print("Status        : SUCCESS")
 
 
             print(
-
                 f"Missing MAE   : "
                 f"{result['missing_mae']:.6f}"
-
             )
 
 
             print(
-
                 f"Missing RMSE  : "
                 f"{result['missing_rmse']:.6f}"
-
             )
 
 
             print(
-
                 f"MAE           : "
                 f"{result['MAE']:.6f}"
-
             )
 
 
             print(
-
                 f"RMSE          : "
                 f"{result['RMSE']:.6f}"
-
             )
 
 
             print(
-
                 f"PSNR          : "
                 f"{result['PSNR']:.6f} dB"
-
             )
 
 
             print(
-
                 f"SNR           : "
                 f"{result['SNR']:.6f} dB"
-
             )
 
 
             print(
-
                 f"SSIM          : "
                 f"{result['SSIM']:.6f}"
-
             )
 
 
             print(
-
                 f"Aleatoric var : "
                 f"{result['aleatoric_variance_mean']:.6e}"
-
             )
 
 
             print(
-
                 f"Epistemic var : "
                 f"{result['epistemic_variance_mean']:.6e}"
-
             )
 
 
             print(
-
                 f"Predictive var: "
                 f"{result['predictive_variance_mean']:.6e}"
-
             )
 
 
             print(
-
                 f"Predictive σ  : "
                 f"{result['predictive_std_mean']:.6e}"
-
             )
 
 
             print(
-
                 f"Runtime       : "
                 f"{result['runtime_seconds']:.4f} s"
-
             )
 
 
             print(
-
                 f"Observed err  : "
                 f"{result['observed_preservation_error']:.6e}"
-
             )
 
 
@@ -2859,19 +2203,12 @@ def main():
 
 
             print()
-
-            print(
-
-                "Status        : FAILED"
-
-            )
+            print("Status        : FAILED")
 
 
             print(
-
                 f"Error         : "
                 f"{exc}"
-
             )
 
 
@@ -2981,9 +2318,7 @@ def main():
         # ============================================================
 
         records.append(
-
             result
-
         )
 
 
@@ -2992,11 +2327,8 @@ def main():
     # ================================================================
 
     write_csv(
-
         RESULTS_FILE,
-
         records
-
     )
 
 
@@ -3020,18 +2352,13 @@ def main():
     # ================================================================
 
     summaries = calculate_summary(
-
         successful_records
-
     )
 
 
     write_csv(
-
         SUMMARY_FILE,
-
         summaries
-
     )
 
 
@@ -3040,100 +2367,57 @@ def main():
     # ================================================================
 
     print()
-
     print("=" * 78)
-
-    print(
-
-        "PROPOSED MODEL CONTROLLED MATRIX COMPLETE"
-
-    )
-
+    print("PROPOSED MODEL CONTROLLED MATRIX COMPLETE")
     print("=" * 78)
 
 
     print()
-
     print(
-
         f"Full matrix cases : "
         f"{expected_cases}"
-
     )
 
 
     print(
-
         f"Cases to run      : "
         f"{cases_to_execute}"
-
     )
 
 
     print(
-
         f"Completed cases   : "
         f"{completed_cases}"
-
     )
 
 
     print(
-
         f"Successful        : "
         f"{successful_cases}"
-
     )
 
 
     print(
-
         f"Failed            : "
         f"{failed_cases}"
-
     )
 
 
     print()
-
     print(
-
         f"Execution mode    : "
         f"{execution_mode}"
-
     )
 
 
     print()
-
-    print(
-
-        "Raw results:"
-
-    )
-
-
-    print(
-
-        RESULTS_FILE
-
-    )
+    print("Raw results:")
+    print(RESULTS_FILE)
 
 
     print()
-
-    print(
-
-        "Summary results:"
-
-    )
-
-
-    print(
-
-        SUMMARY_FILE
-
-    )
+    print("Summary results:")
+    print(SUMMARY_FILE)
 
 
     # ================================================================
@@ -3141,63 +2425,41 @@ def main():
     # ================================================================
 
     if (
-
         completed_cases == cases_to_execute
-
         and
-
         successful_cases == cases_to_execute
-
         and
-
         failed_cases == 0
-
     ):
 
         print()
-
-        print(
-
-            "OVERALL STATUS: PASS"
-
-        )
+        print("OVERALL STATUS: PASS")
 
 
         if CONTROLLED_MATRIX_CASE_LIMIT is None:
 
             print(
-
                 "All controlled proposed-model "
                 "experiments completed successfully."
-
             )
 
         else:
 
             print(
-
                 "All smoke-test controlled proposed-model "
                 "experiments completed successfully."
-
             )
 
 
     else:
 
         print()
-
-        print(
-
-            "OVERALL STATUS: FAIL"
-
-        )
+        print("OVERALL STATUS: FAIL")
 
 
         print(
-
             "One or more controlled "
             "experiments failed."
-
         )
 
 
