@@ -300,6 +300,115 @@ def set_seed(seed):
 
 
 # ====================================================================
+# DEVICE COMPARISON
+# ====================================================================
+
+def devices_match(
+    tensor_device,
+    expected_device
+):
+    """
+    Compare two PyTorch devices correctly.
+
+    Important:
+    -----------
+    PyTorch may represent the same first CUDA device as:
+
+        cuda
+
+    or:
+
+        cuda:0
+
+    These must be treated as equivalent.
+
+    Examples
+    --------
+    cuda     == cuda:0    -> True
+    cuda:0   == cuda:0    -> True
+    cuda:1   == cuda:0    -> False
+    cpu      == cuda      -> False
+    """
+
+    actual = torch.device(
+        tensor_device
+    )
+
+    expected = torch.device(
+        expected_device
+    )
+
+
+    # ---------------------------------------------------------------
+    # Device types must match.
+    # ---------------------------------------------------------------
+
+    if actual.type != expected.type:
+
+        return False
+
+
+    # ---------------------------------------------------------------
+    # CPU has no device index.
+    # ---------------------------------------------------------------
+
+    if actual.type == "cpu":
+
+        return True
+
+
+    # ---------------------------------------------------------------
+    # CUDA device comparison.
+    #
+    # torch.device("cuda") has no explicit index.
+    #
+    # A tensor normally reports:
+    #
+    #     cuda:0
+    #
+    # Therefore, resolve an unspecified CUDA index to the current
+    # CUDA device before comparing.
+    # ---------------------------------------------------------------
+
+    if actual.type == "cuda":
+
+        actual_index = (
+
+            torch.cuda.current_device()
+
+            if actual.index is None
+
+            else actual.index
+
+        )
+
+
+        expected_index = (
+
+            torch.cuda.current_device()
+
+            if expected.index is None
+
+            else expected.index
+
+        )
+
+
+        return (
+            actual_index
+            ==
+            expected_index
+        )
+
+
+    # ---------------------------------------------------------------
+    # Fallback for other device types.
+    # ---------------------------------------------------------------
+
+    return actual == expected
+
+
+# ====================================================================
 # METRIC CONVERSION
 # ====================================================================
 
@@ -730,17 +839,44 @@ def run_single_experiment(
     #     [B,C,D,H,W]
     # ================================================================
 
-    corrupted = corrupted.to(DEVICE)
+    corrupted = corrupted.to(
+        DEVICE
+    )
 
-    target = target.to(DEVICE)
+    target = target.to(
+        DEVICE
+    )
 
-    mask = mask.to(DEVICE)
+    mask = mask.to(
+        DEVICE
+    )
 
-    velocity = velocity.to(DEVICE)
+    velocity = velocity.to(
+        DEVICE
+    )
 
 
     # ================================================================
     # DEVICE CONSISTENCY VALIDATION
+    # ================================================================
+    #
+    # IMPORTANT:
+    #
+    # Do NOT use:
+    #
+    #     tensor.device != DEVICE
+    #
+    # because:
+    #
+    #     torch.device("cuda")
+    #
+    # and:
+    #
+    #     torch.device("cuda:0")
+    #
+    # can represent the same CUDA device.
+    #
+    # devices_match() explicitly resolves the CUDA index.
     # ================================================================
 
     experiment_tensors = {
@@ -760,9 +896,14 @@ def run_single_experiment(
     }
 
 
-    for name, tensor in experiment_tensors.items():
+    for name, tensor in (
+        experiment_tensors.items()
+    ):
 
-        if tensor.device != DEVICE:
+        if not devices_match(
+            tensor.device,
+            DEVICE
+        ):
 
             raise RuntimeError(
 
