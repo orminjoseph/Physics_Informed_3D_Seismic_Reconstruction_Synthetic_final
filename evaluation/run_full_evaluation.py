@@ -1438,7 +1438,7 @@ def main() -> None:
     else:
 
         run_module(
-            "evaluation.thesis_tables",
+            "evaluation.final_thesis_tables",
             "Thesis table generation",
         )
 
