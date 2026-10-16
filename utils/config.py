@@ -114,7 +114,7 @@ EXPERIMENT_NAME = "synthetic_training"
 
 # Number of synthetic seismic volumes.
 
-SYNTHETIC_NUM_SAMPLES = 10
+SYNTHETIC_NUM_SAMPLES = 50
 
 
 # Synthetic seismic cube dimensions:
@@ -467,7 +467,7 @@ For the final PhD experiment:
     CONTROLLED_MATRIX_CASE_LIMIT = None
 """
 
-CONTROLLED_MATRIX_CASE_LIMIT = 10
+CONTROLLED_MATRIX_CASE_LIMIT = 50
 
 
 # =========================================================
