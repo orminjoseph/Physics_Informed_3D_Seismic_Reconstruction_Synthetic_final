@@ -491,79 +491,49 @@ def _trace_observation_fraction(
 # PREDICTION COEFFICIENT ESTIMATION
 # ======================================================================
 
+
 def _estimate_prediction_coefficients(
     trace: np.ndarray,
     order: int,
 ) -> np.ndarray:
     """
-    Estimate complex-valued linear prediction coefficients.
+    Estimate numerically stabilized complex-valued
+    linear prediction coefficients for f-x reconstruction.
 
-    Model:
-
-        x[n] ≈ a1*x[n-1] + ... + ap*x[n-p]
-
-    Parameters
-    ----------
-    trace:
-        Complex-valued spatial-frequency trace.
-
-    order:
-        Prediction filter order.
-
-    Returns
-    -------
-    ndarray
-        Complex-valued prediction coefficients.
+    Ridge regularization reduces sensitivity to ill-conditioned
+    prediction systems. An L1 coefficient constraint limits
+    recursive prediction growth.
     """
 
-    # --------------------------------------------------------------
-    # Convert to complex representation.
-    # --------------------------------------------------------------
+    trace = np.asarray(trace, dtype=np.complex128)
 
-    trace = np.asarray(
-        trace,
+    # Always provide a safe zero-coefficient fallback.
+    zero_coefficients = np.zeros(
+        order,
         dtype=np.complex128,
     )
 
-    # --------------------------------------------------------------
-    # Numerical safety.
-    # --------------------------------------------------------------
+    # Reject non-finite input.
+    if not np.isfinite(trace).all():
+        return zero_coefficients
 
-    if not np.isfinite(
-        trace
-    ).all():
-
-        return np.zeros(
-            order,
-            dtype=np.complex128,
-        )
-
-    # --------------------------------------------------------------
-    # Ensure sufficient samples exist.
-    # --------------------------------------------------------------
-
+    # A prediction filter requires more samples than its order.
     if trace.size <= order:
+        return zero_coefficients
 
-        return np.zeros(
-            order,
-            dtype=np.complex128,
-        )
+    # Normalize the trace to improve numerical conditioning.
+    trace_scale = float(np.max(np.abs(trace)))
 
-    # --------------------------------------------------------------
-    # Construct the least-squares system.
-    # --------------------------------------------------------------
+    if not np.isfinite(trace_scale) or trace_scale <= 1e-12:
+        return zero_coefficients
 
-    number_of_rows = (
-        trace.size
-        -
-        order
-    )
+    normalized_trace = trace / trace_scale
+
+    # Construct the least-squares prediction system.
+    number_of_rows = trace.size - order
 
     A = np.empty(
-        (
-            number_of_rows,
-            order,
-        ),
+        (number_of_rows, order),
         dtype=np.complex128,
     )
 
@@ -572,61 +542,73 @@ def _estimate_prediction_coefficients(
         dtype=np.complex128,
     )
 
-    # --------------------------------------------------------------
-    # Construct predictor matrix and target vector.
-    # --------------------------------------------------------------
-
-    for row, index in enumerate(
-        range(
-            order,
-            trace.size,
-        )
-    ):
-
-        A[row, :] = trace[
+    for row, index in enumerate(range(order, trace.size)):
+        A[row, :] = normalized_trace[
             index - order:index
         ][::-1]
 
-        b[row] = trace[
-            index
-        ]
+        b[row] = normalized_trace[index]
 
-    # --------------------------------------------------------------
-    # Solve complex least-squares problem.
-    # --------------------------------------------------------------
+    # Reject an invalid prediction system.
+    if not np.isfinite(A).all() or not np.isfinite(b).all():
+        return zero_coefficients
 
     try:
+        # Form the regularized complex least-squares system.
+        A_h = A.conj().T
+        gram = A_h @ A
+        rhs = A_h @ b
 
-        coefficients, _, _, _ = (
-            np.linalg.lstsq(
-                A,
-                b,
-                rcond=None,
-            )
+        average_energy = float(
+            np.real(np.trace(gram)) / order
         )
 
-    except np.linalg.LinAlgError:
+        if not np.isfinite(average_energy):
+            return zero_coefficients
 
-        return np.zeros(
+        # Scale regularization to the prediction system's energy.
+        ridge = 1e-6 * max(average_energy, 1e-12)
+
+        regularized_gram = gram + ridge * np.eye(
             order,
             dtype=np.complex128,
         )
 
-    # --------------------------------------------------------------
-    # Numerical safety.
-    # --------------------------------------------------------------
-
-    if not np.isfinite(
-        coefficients
-    ).all():
-
-        return np.zeros(
-            order,
-            dtype=np.complex128,
+        coefficients = np.linalg.solve(
+            regularized_gram,
+            rhs,
         )
+
+    except (np.linalg.LinAlgError, FloatingPointError):
+        return zero_coefficients
+
+    # Reject non-finite estimated coefficients.
+    if not np.isfinite(coefficients).all():
+        return zero_coefficients
+
+    # ----------------------------------------------------------
+    # Stability constraint
+    # ----------------------------------------------------------
+    # Limit the sum of coefficient magnitudes. This constrains
+    # recursive predictions and reduces the risk of runaway
+    # amplitudes during forward and reverse prediction.
+    coefficient_l1 = float(np.sum(np.abs(coefficients)))
+
+    maximum_coefficient_l1 = 0.98
+
+    if not np.isfinite(coefficient_l1):
+        return zero_coefficients
+
+    if coefficient_l1 > maximum_coefficient_l1:
+        coefficients = (
+            coefficients
+            * (maximum_coefficient_l1 / coefficient_l1)
+        )
+
+    if not np.isfinite(coefficients).all():
+        return zero_coefficients
 
     return coefficients
-
 
 # ======================================================================
 # ONE-DIMENSIONAL F-X PREDICTION
@@ -1144,6 +1126,13 @@ def fx_prediction_reconstruction(
             previous_iteration = (
                 channel_reconstruction.copy()
             )
+
+            # Validate the current reconstruction before the FFT.
+            if not np.isfinite(channel_reconstruction).all():
+                raise FloatingPointError(
+                    "Non-finite values detected before the f-x "
+                    f"Fourier transform in channel {channel}."
+                )
 
             # ------------------------------------------------------
             # Fourier transform along temporal/depth axis.
