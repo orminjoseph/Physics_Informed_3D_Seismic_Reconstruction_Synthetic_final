@@ -20,17 +20,17 @@ The runner supports:
     6. Uncertainty statistics
     7. Controlled six-classical-baseline experiments
     8. Controlled proposed-model experiment
-    9. Ablation study
-   10. Statistical significance
-   11. Thesis tables
-   12. Final report
+    9. Common seven-method representative comparison
+   10. Ablation study
+   11. Statistical significance
+   12. Thesis tables
+   13. Final report
 
 IMPORTANT
 ---------
-The common seven-method representative comparison is NOT executed
-by this master controller.
-
-It is a separate evaluation and must be run independently through:
+The common seven-method representative comparison is executed by
+this master controller after the controlled proposed-model experiment
+and before the ablation study, through:
 
     evaluation.baselines.compare_with_baselines
 
@@ -741,7 +741,56 @@ def controlled_proposed_model_complete() -> bool:
 
 
 # ====================================================================
-# STAGE 8 VALIDATION
+# STAGE 8 VALIDATION — COMMON SEVEN-METHOD COMPARISON
+# ====================================================================
+
+def common_baseline_comparison_complete() -> bool:
+    """Check whether the common seven-method comparison outputs exist."""
+
+    results_path = REPORT_PATH / "baseline_comparison.csv"
+    summary_path = REPORT_PATH / "baseline_comparison_summary.csv"
+
+    required_columns = [
+        "method",
+        "MAE",
+        "RMSE",
+        "PSNR",
+        "SNR",
+        "SSIM",
+        "status",
+    ]
+
+    if not csv_has_required_columns(results_path, required_columns):
+        return False
+
+    if not file_is_valid(summary_path):
+        return False
+
+    try:
+        with open(results_path, "r", newline="", encoding="utf-8") as file:
+            rows = list(csv.DictReader(file))
+    except (OSError, csv.Error):
+        return False
+
+    expected_methods = {
+        "nearest_neighbor",
+        "linear_interpolation",
+        "fx_prediction",
+        "compressive_sensing",
+        "curvelet_pocs",
+        "dictionary_learning",
+        "proposed_physics_informed_3d",
+    }
+
+    return (
+        len(rows) == 7
+        and {row.get("method", "") for row in rows} == expected_methods
+        and all(row.get("status", "") == "PASS" for row in rows)
+    )
+
+
+# ====================================================================
+# STAGE 9 VALIDATION
 # ====================================================================
 
 def ablation_complete() -> bool:
@@ -782,7 +831,7 @@ def ablation_complete() -> bool:
 
 
 # ====================================================================
-# STAGE 9 VALIDATION
+# STAGE 10 VALIDATION
 # ====================================================================
 
 def statistical_significance_complete() -> bool:
@@ -813,7 +862,7 @@ def statistical_significance_complete() -> bool:
 
 
 # ====================================================================
-# STAGE 10 VALIDATION
+# STAGE 11 VALIDATION
 # ====================================================================
 
 def thesis_tables_complete() -> bool:
@@ -855,7 +904,7 @@ def thesis_tables_complete() -> bool:
 
 
 # ====================================================================
-# STAGE 11 VALIDATION
+# STAGE 12 VALIDATION
 # ====================================================================
 
 def final_report_complete() -> bool:
@@ -913,6 +962,11 @@ def display_pipeline_status() -> None:
         (
             "Controlled Proposed Model",
             controlled_proposed_model_complete(),
+        ),
+
+        (
+            "Common Seven-Method Comparison",
+            common_baseline_comparison_complete(),
         ),
 
         (
@@ -1367,11 +1421,37 @@ def main() -> None:
         run_controlled_proposed_model()
 
     # =================================================================
-    # STAGE 8 — ABLATION STUDY
+    # STAGE 8 — COMMON SEVEN-METHOD COMPARISON
     # =================================================================
 
     print_stage(
         8,
+        "COMMON SEVEN-METHOD COMPARISON",
+    )
+
+    if (
+        resume
+        and common_baseline_comparison_complete()
+    ):
+
+        print(
+            "[SKIPPED] Common seven-method comparison "
+            "already completed."
+        )
+
+    else:
+
+        run_module(
+            "evaluation.baselines.compare_with_baselines",
+            "Common seven-method reconstruction comparison",
+        )
+
+    # =================================================================
+    # STAGE 9 — ABLATION STUDY
+    # =================================================================
+
+    print_stage(
+        9,
         "ABLATION STUDY",
     )
 
@@ -1392,11 +1472,11 @@ def main() -> None:
         )
 
     # =================================================================
-    # STAGE 9 — STATISTICAL SIGNIFICANCE
+    # STAGE 10 — STATISTICAL SIGNIFICANCE
     # =================================================================
 
     print_stage(
-        9,
+        10,
         "STATISTICAL SIGNIFICANCE",
     )
 
@@ -1418,11 +1498,11 @@ def main() -> None:
         )
 
     # =================================================================
-    # STAGE 10 — THESIS TABLES
+    # STAGE 11 — THESIS TABLES
     # =================================================================
 
     print_stage(
-        10,
+        11,
         "THESIS TABLES",
     )
 
@@ -1443,11 +1523,11 @@ def main() -> None:
         )
 
     # =================================================================
-    # STAGE 11 — FINAL REPORT
+    # STAGE 12 — FINAL REPORT
     # =================================================================
 
     print_stage(
-        11,
+        12,
         "FINAL REPORT",
     )
 
